@@ -1,4 +1,5 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { UnauthorizedError, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -31,11 +32,27 @@ export interface ConnectionOptions {
   clientInfo?: Implementation;
   /** Extra HTTP headers (auth etc.) for the http/sse transports. */
   headers?: Record<string, string>;
+  /** OAuth provider for the http/sse transports. When set and the server needs
+   *  auth, `Connection.create` throws a {@link PendingAuthError}. */
+  authProvider?: OAuthClientProvider;
   /** Observe every JSON-RPC message on the transport (for a protocol tap). */
   onMessage?: MessageTap;
 }
 
 const DEFAULT_CLIENT_INFO: Implementation = { name: 'mcp-studio', version: '0.1.0' };
+
+/**
+ * Thrown by `Connection.create` when the server requires OAuth and there's no
+ * usable token: the transport has already handed the authorization URL to the
+ * provider's `redirectToAuthorization`. Capture the `?code=` from the redirect,
+ * then call `finishAuth(code)` to complete the token exchange and connect.
+ */
+export class PendingAuthError extends Error {
+  constructor(readonly finishAuth: (authorizationCode: string) => Promise<Connection>) {
+    super('OAuth authorization required');
+    this.name = 'PendingAuthError';
+  }
+}
 
 function createTransport(config: TransportConfig, options: ConnectionOptions): Transport {
   switch (config.transport) {
@@ -49,12 +66,23 @@ function createTransport(config: TransportConfig, options: ConnectionOptions): T
     case 'http':
       return new StreamableHTTPClientTransport(new URL(config.url), {
         requestInit: options.headers ? { headers: options.headers } : undefined,
+        authProvider: options.authProvider,
       });
     case 'sse':
       return new SSEClientTransport(new URL(config.url), {
         requestInit: options.headers ? { headers: options.headers } : undefined,
+        authProvider: options.authProvider,
       });
   }
+}
+
+/** Finish the OAuth code exchange on a (HTTP/SSE) transport. */
+async function finishTransportAuth(transport: Transport, authorizationCode: string): Promise<void> {
+  if (transport instanceof StreamableHTTPClientTransport || transport instanceof SSEClientTransport) {
+    await transport.finishAuth(authorizationCode);
+    return;
+  }
+  throw new Error('finishAuth is only meaningful for the http/sse transports');
 }
 
 /** Wrap `transport.send` so every outgoing message is observed. Call before
@@ -92,12 +120,30 @@ export class Connection {
     readonly transportKind: TransportConfig['transport'],
   ) {}
 
-  /** Build the transport, create the client, run the initialize handshake. */
+  /**
+   * Build the transport, create the client, run the initialize handshake.
+   * Throws {@link PendingAuthError} if the server needs OAuth and there's no
+   * usable token (the authorization redirect has already been triggered).
+   */
   static async create(config: TransportConfig, options: ConnectionOptions = {}): Promise<Connection> {
     const client = new Client(options.clientInfo ?? DEFAULT_CLIENT_INFO, { capabilities: {} });
     const transport = createTransport(config, options);
     if (options.onMessage) tapTransport(transport, options.onMessage);
-    await client.connect(transport); // sets transport.onmessage — re-wrap it below
+    try {
+      await client.connect(transport); // sets transport.onmessage — re-wrap it below
+    } catch (cause) {
+      if (cause instanceof UnauthorizedError) {
+        // The transport already called options.authProvider.redirectToAuthorization
+        // and saved the PKCE verifier on the provider. finishTransportAuth exchanges
+        // the code → tokens (persisted via the provider), then a fresh connect
+        // attempt picks them up.
+        throw new PendingAuthError(async (authorizationCode) => {
+          await finishTransportAuth(transport, authorizationCode);
+          return Connection.create(config, options);
+        });
+      }
+      throw cause;
+    }
     if (options.onMessage) tapIncoming(transport, options.onMessage);
     return new Connection(client, transport, config.transport);
   }

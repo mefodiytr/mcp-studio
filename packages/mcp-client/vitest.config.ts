@@ -11,11 +11,11 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: ['src/index.ts'], // re-exports only
-      // A regression floor, not an aspiration: the happy path of `Connection`
-      // is covered by the integration test here (and end-to-end by the
-      // Playwright suite); the HTTP/SSE transports and the error/disconnect
-      // paths still want dedicated unit tests — raise these when they land.
-      thresholds: { lines: 55, functions: 40, statements: 55, branches: 50 },
+      // A regression floor that ratchets up as tests accrue (master-spec §13).
+      // `Connection`'s happy path is the integration test here (+ the Playwright
+      // e2e); `oauth.ts` is unit-tested; the HTTP/SSE transports and the
+      // error/disconnect paths still want dedicated tests — raise again then.
+      thresholds: { lines: 75, functions: 60, statements: 75, branches: 75 },
     },
   },
 });
