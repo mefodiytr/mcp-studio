@@ -2,6 +2,8 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 
+import { registerIpcHandlers, startDemoEventSource } from './ipc';
+
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL'];
 // Automation hook: when set, capture the rendered window to this PNG path once
 // the renderer has loaded, then quit. Used for screenshots and CI smoke checks;
@@ -69,8 +71,13 @@ if (!gotSingleInstanceLock) {
 } else {
   app.on('second-instance', focusExistingWindow);
 
+  let stopDemoEvents: (() => void) | undefined;
+
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.mcpstudio.app');
+
+    registerIpcHandlers();
+    stopDemoEvents = startDemoEventSource();
 
     createMainWindow();
 
@@ -78,6 +85,8 @@ if (!gotSingleInstanceLock) {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
     });
   });
+
+  app.on('will-quit', () => stopDemoEvents?.());
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

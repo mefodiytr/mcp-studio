@@ -1,11 +1,10 @@
 /// <reference types="vite/client" />
+import type { StudioBridge } from '@shared/ipc/bridge';
 
-interface Window {
-  /**
-   * Bridge exposed by the preload script. Currently minimal; the full typed
-   * IPC surface arrives in C4.
-   */
-  studio?: {
-    versions: Record<string, string>;
-  };
+declare global {
+  interface Window {
+    /** Bridge exposed by the preload script (contextBridge). Undefined only
+     *  outside Electron. */
+    studio?: StudioBridge;
+  }
 }

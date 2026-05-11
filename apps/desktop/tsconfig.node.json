@@ -4,7 +4,11 @@
     "lib": ["ES2023"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"]
+    }
   },
-  "include": ["src/main", "src/preload", "electron.vite.config.ts"]
+  "include": ["src/main", "src/preload", "src/shared", "electron.vite.config.ts", "vitest.config.ts"]
 }
