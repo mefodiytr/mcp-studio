@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { connectionSummarySchema, toolSummarySchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
+import { protocolEventSchema } from '../domain/protocol';
 
 /**
  * The single source of truth for the renderer ↔ main IPC surface.
@@ -81,6 +82,16 @@ export const invokeChannels = {
     request: z.object({ connectionId: z.string() }),
     response: z.object({ tools: z.array(toolSummarySchema) }),
   },
+
+  // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────
+  'protocol:backlog': {
+    request: z.object({}),
+    response: z.object({ events: z.array(protocolEventSchema) }),
+  },
+  'protocol:clear': {
+    request: z.object({}),
+    response: z.object({}),
+  },
 } as const;
 
 export const eventChannels = {
@@ -90,6 +101,8 @@ export const eventChannels = {
   /** Emitted whenever the set of live connections changes (connect / disconnect
    *  / drop). Carries the full current list so the renderer can replace state. */
   'connections:changed': z.object({ connections: z.array(connectionSummarySchema) }),
+  /** One JSON-RPC message observed on a connection's transport. */
+  'protocol:event': protocolEventSchema,
 } as const;
 
 export type InvokeChannel = keyof typeof invokeChannels;

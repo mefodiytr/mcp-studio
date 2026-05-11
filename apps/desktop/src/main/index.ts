@@ -4,10 +4,12 @@ import { app, BrowserWindow, safeStorage, shell } from 'electron';
 
 import { ConnectionManager } from './connections/connection-manager';
 import { StdioPidTracker } from './connections/pid-tracker';
+import { ProtocolTap } from './connections/protocol-tap';
 import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ipc';
 import { registerConnectionHandlers } from './ipc/connections';
 import { registerCredentialHandlers } from './ipc/credentials';
 import { registerProfileHandlers } from './ipc/profiles';
+import { registerProtocolHandlers } from './ipc/protocol';
 import { createConfigStore, type AppConfig } from './store/config-store';
 import { CredentialVault, createCredentialVaultStore, type SecretCipher } from './store/credential-vault';
 import type { JsonStore } from './store/json-store';
@@ -127,7 +129,8 @@ if (!gotSingleInstanceLock) {
           orphans.map((o) => o.pid).join(', '),
       );
     }
-    connectionManager = new ConnectionManager(profiles, vault, pidTracker, (connections) =>
+    const protocolTap = new ProtocolTap((event) => emitToRenderers('protocol:event', event));
+    connectionManager = new ConnectionManager(profiles, vault, pidTracker, protocolTap, (connections) =>
       emitToRenderers('connections:changed', { connections }),
     );
 
@@ -135,6 +138,7 @@ if (!gotSingleInstanceLock) {
     registerProfileHandlers(profiles, vault);
     registerCredentialHandlers(profiles, vault);
     registerConnectionHandlers(connectionManager);
+    registerProtocolHandlers(protocolTap);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

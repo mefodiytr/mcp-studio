@@ -8,6 +8,7 @@ import type {
   CallToolResult,
   GetPromptResult,
   Implementation,
+  JSONRPCMessage,
   Prompt,
   ReadResourceResult,
   Resource,
@@ -15,6 +16,9 @@ import type {
   ServerCapabilities,
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+
+export type MessageDirection = 'outgoing' | 'incoming';
+export type MessageTap = (direction: MessageDirection, message: JSONRPCMessage) => void;
 
 export type TransportConfig =
   | { transport: 'http'; url: string }
@@ -26,6 +30,8 @@ export interface ConnectionOptions {
   clientInfo?: Implementation;
   /** Extra HTTP headers (auth etc.) for the http/sse transports. */
   headers?: Record<string, string>;
+  /** Observe every JSON-RPC message on the transport (for a protocol tap). */
+  onMessage?: MessageTap;
 }
 
 const DEFAULT_CLIENT_INFO: Implementation = { name: 'mcp-studio', version: '0.1.0' };
@@ -50,6 +56,26 @@ function createTransport(config: TransportConfig, options: ConnectionOptions): T
   }
 }
 
+/** Wrap `transport.send` so every outgoing message is observed. Call before
+ *  `client.connect()` so the `initialize` request is seen too. */
+function tapTransport(transport: Transport, tap: MessageTap): void {
+  const send = transport.send.bind(transport);
+  transport.send = (message, sendOptions) => {
+    tap('outgoing', message);
+    return send(message, sendOptions);
+  };
+}
+
+/** Wrap `transport.onmessage` so every incoming message is observed. Call after
+ *  `client.connect()`, which installs the SDK's own `onmessage` handler. */
+function tapIncoming(transport: Transport, tap: MessageTap): void {
+  const downstream = transport.onmessage;
+  transport.onmessage = (message, ...rest) => {
+    tap('incoming', message);
+    downstream?.(message, ...rest);
+  };
+}
+
 const CLOSE_TIMEOUT_MS = 2_000;
 
 /**
@@ -69,7 +95,9 @@ export class Connection {
   static async create(config: TransportConfig, options: ConnectionOptions = {}): Promise<Connection> {
     const client = new Client(options.clientInfo ?? DEFAULT_CLIENT_INFO, { capabilities: {} });
     const transport = createTransport(config, options);
-    await client.connect(transport);
+    if (options.onMessage) tapTransport(transport, options.onMessage);
+    await client.connect(transport); // sets transport.onmessage — re-wrap it below
+    if (options.onMessage) tapIncoming(transport, options.onMessage);
     return new Connection(client, transport, config.transport);
   }
 

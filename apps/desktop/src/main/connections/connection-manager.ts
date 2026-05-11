@@ -7,6 +7,7 @@ import type { Profile } from '../../shared/domain/profile';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
+import type { ProtocolTap } from './protocol-tap';
 
 interface Managed {
   connectionId: string;
@@ -49,6 +50,7 @@ export class ConnectionManager {
     private readonly repo: ProfileRepository,
     private readonly vault: CredentialVault,
     private readonly pidTracker: StdioPidTracker,
+    private readonly tap: ProtocolTap,
     private readonly onChanged: (summaries: ConnectionSummary[]) => void,
   ) {}
 
@@ -61,6 +63,7 @@ export class ConnectionManager {
     const connection = await Connection.create(transportConfigFor(profile), {
       clientInfo: { name: 'mcp-studio', version: '0.1.0' },
       headers: headersFor(profile, this.vault),
+      onMessage: (direction, message) => this.tap.record(connectionId, direction, message),
     });
 
     try {
@@ -120,6 +123,7 @@ export class ConnectionManager {
       await managed.connection.close();
     } finally {
       if (managed.childPid !== undefined) this.pidTracker.remove(managed.childPid);
+      this.tap.forget(connectionId);
       this.emitChanged();
     }
   }
