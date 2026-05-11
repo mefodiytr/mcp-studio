@@ -365,7 +365,8 @@ function compileInner(schema: JsonSchema, root: SchemaObject, seen: Set<string>)
 
 // ── defaults ──────────────────────────────────────────────────────────────────
 
-function defaultsFor(field: FieldNode): unknown {
+/** The value to seed a field (or a fresh array item) with. */
+export function defaultValueFor(field: FieldNode): unknown {
   switch (field.kind) {
     case 'string':
     case 'number':
@@ -379,10 +380,10 @@ function defaultsFor(field: FieldNode): unknown {
     case 'array':
       return field.default ?? [];
     case 'union':
-      return field.variants.length > 0 ? defaultsFor(field.variants[0]!.field) : undefined;
+      return field.variants.length > 0 ? defaultValueFor(field.variants[0]!.field) : undefined;
     case 'object': {
       const out: Record<string, unknown> = {};
-      for (const f of field.fields) out[f.name] = defaultsFor(f.field);
+      for (const f of field.fields) out[f.name] = defaultValueFor(f.field);
       return out;
     }
   }
@@ -396,5 +397,5 @@ function defaultsFor(field: FieldNode): unknown {
 export function compileSchema(schema: JsonSchema): CompiledForm {
   const root = asSchemaObject(schema) ?? {};
   const { field, validator } = compileInner(schema, root, new Set<string>());
-  return { field, validator, defaultValue: defaultsFor(field) };
+  return { field, validator, defaultValue: defaultValueFor(field) };
 }

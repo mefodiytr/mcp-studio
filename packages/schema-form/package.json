@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Compiles a JSON Schema into a renderable field tree + a zod validator.",
+  "description": "Compiles a JSON Schema into a renderable field tree + a zod validator, with a <SchemaForm> renderer.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./react": "./src/react/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -13,10 +14,20 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "react-hook-form": "^7.75.0",
     "zod": "^3.24.1"
   },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
   "devDependencies": {
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
     "@vitest/coverage-v8": "^2.1.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "vitest": "^2.1.9"
   }
 }

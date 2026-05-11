@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* Workspace packages whose components ship Tailwind classes. */
+@source '../../../../../packages/schema-form/src';
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
