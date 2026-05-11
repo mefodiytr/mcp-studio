@@ -248,6 +248,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 - **Performance timeline** — per-call latency distribution. Histogram + slowest-N. Helps diagnose server bottlenecks.
 - **Session replay** — pick any past session from audit log, replay the protocol exchange against fresh server. Useful for reproducing bugs.
 - **Tool usage stats** — which tools used most, by which server, with what error rates.
+- **Window capture hook** — a dev/CI hook (env var `MCPSTUDIO_CAPTURE_PATH`): the main process renders the application window to a PNG once the renderer has loaded, then exits. Added in M1/C3. Powers screenshots for check-ins/docs (committed under `docs/screenshots/`, one per check-in or milestone boundary) and visual smoke checks in CI (M8).
 
 ### 5.13 Compare & sync (advanced)
 

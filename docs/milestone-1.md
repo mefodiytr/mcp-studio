@@ -137,7 +137,8 @@ Playwright e2e against `@modelcontextprotocol/server-everything` (+ a stdio serv
 
 ### C24 — `chore: packaging smoke + docs`
 `electron-builder.yml` producing an unsigned artifact per OS (CI matrix, no signing/notarization), `README` (what it is, `pnpm dev`, `pnpm build`), `CONTRIBUTING`. Tag `v0.1.0-m1`.
-**AC:** CI uploads an unsigned installer/AppImage/dmg; a teammate can `pnpm i && pnpm dev` from the README alone; the M1 deliverable claim is demonstrable via the e2e run.
+Also: **resolve the hoisted-vs-isolated node_modules question for electron-builder** — `.npmrc` carries `node-linker=hoisted` (set in C1) but pnpm 11 has been building the isolated layout in practice; electron-builder typically wants a hoisted/flat `node_modules` for the unpacked app, so settle this here (force `nodeLinker: hoisted` in `pnpm-workspace.yaml`, or use `public-hoist-pattern` / electron-builder's pnpm handling) and say so explicitly in the commit message.
+**AC:** CI uploads an unsigned installer/AppImage/dmg; a teammate can `pnpm i && pnpm dev` from the README alone; the M1 deliverable claim is demonstrable via the e2e run; the hoisted/isolated tension is resolved and noted.
 
 > Split candidates if they grow during implementation: C12/C13 (schema-form), C15 (result viewer: structured vs text vs media). The C8 SSE-legacy fallback can be its own commit.
 
