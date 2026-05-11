@@ -1,10 +1,12 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, safeStorage, shell } from 'electron';
 
 import { registerIpcHandlers, startDemoEventSource } from './ipc';
+import { registerCredentialHandlers } from './ipc/credentials';
 import { registerProfileHandlers } from './ipc/profiles';
 import { createConfigStore, type AppConfig } from './store/config-store';
+import { CredentialVault, createCredentialVaultStore, type SecretCipher } from './store/credential-vault';
 import type { JsonStore } from './store/json-store';
 import { ProfileRepository } from './store/profile-repository';
 import { createWorkspaceStore } from './store/workspace-store';
@@ -103,8 +105,19 @@ if (!gotSingleInstanceLock) {
     configStore = createConfigStore(userData);
     const profiles = new ProfileRepository(createWorkspaceStore(userData));
 
+    const cipher: SecretCipher = {
+      isAvailable: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (plaintext) => safeStorage.encryptString(plaintext),
+      decrypt: (ciphertext) => safeStorage.decryptString(ciphertext),
+    };
+    if (!cipher.isAvailable()) {
+      console.warn('[vault] OS-backed encryption unavailable; secrets stored with reduced protection');
+    }
+    const vault = new CredentialVault(createCredentialVaultStore(userData), cipher);
+
     registerIpcHandlers();
-    registerProfileHandlers(profiles);
+    registerProfileHandlers(profiles, vault);
+    registerCredentialHandlers(profiles, vault);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

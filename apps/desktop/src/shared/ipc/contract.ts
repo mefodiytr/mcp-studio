@@ -44,6 +44,20 @@ export const invokeChannels = {
     request: z.object({ id: z.string() }),
     response: z.object({ id: z.string() }),
   },
+
+  // ── Credentials (OS-encrypted vault; the renderer only ever sees the hint) ──
+  'credentials:set': {
+    request: z.object({ profileId: z.string(), secret: z.string().min(1) }),
+    response: z.object({ hint: z.string() }),
+  },
+  'credentials:hint': {
+    request: z.object({ profileId: z.string() }),
+    response: z.object({ hint: z.string().nullable() }),
+  },
+  'credentials:clear': {
+    request: z.object({ profileId: z.string() }),
+    response: z.object({ profileId: z.string() }),
+  },
 } as const;
 
 export const eventChannels = {
