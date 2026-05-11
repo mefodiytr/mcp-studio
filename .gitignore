@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+out/
+build/Release/
+release/
+*.tsbuildinfo
+
+# Vite / electron-vite
+.vite/
+
+# Test / coverage
+coverage/
+playwright-report/
+test-results/
+
+# Caches
+.eslintcache
+.cache/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Local-only
+*.local
