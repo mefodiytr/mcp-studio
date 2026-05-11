@@ -17,14 +17,14 @@ import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-export type AppView = 'connections' | 'tools' | 'history' | 'raw';
+export type AppView = 'connections' | 'tools' | 'resources' | 'history' | 'raw';
 
 const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'servers', Icon: Server, view: 'connections' },
   { key: 'tools', Icon: Wrench, view: 'tools' },
+  { key: 'resources', Icon: Files, view: 'resources' },
   { key: 'history', Icon: History, view: 'history' },
   { key: 'raw', Icon: Braces, view: 'raw' },
-  { key: 'resources', Icon: Files },
   { key: 'prompts', Icon: MessageSquare },
   { key: 'inspector', Icon: Activity },
 ];

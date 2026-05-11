@@ -17,4 +17,11 @@ export function registerConnectionHandlers(manager: ConnectionManager): void {
   }));
   handle('connections:call', ({ connectionId, toolName, args }) => manager.callTool(connectionId, toolName, args));
   handle('connections:raw', ({ connectionId, method, params }) => manager.rawRequest(connectionId, method, params));
+  handle('connections:resources', async ({ connectionId }) => ({
+    resources: await manager.listResources(connectionId),
+  }));
+  handle('connections:resourceTemplates', async ({ connectionId }) => ({
+    templates: await manager.listResourceTemplates(connectionId),
+  }));
+  handle('connections:readResource', ({ connectionId, uri }) => manager.readResource(connectionId, uri));
 }

@@ -4,6 +4,11 @@ import { Connection, McpError, type TransportConfig } from '@mcp-studio/mcp-clie
 
 import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
+import type {
+  ReadResourceResult,
+  ResourceDescriptor,
+  ResourceTemplateDescriptor,
+} from '../../shared/domain/resource';
 import type { RawRequestOutcome, ToolCallOutcome } from '../../shared/domain/tool-result';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
@@ -196,6 +201,39 @@ export class ConnectionManager {
     });
     this.onHistoryChanged();
     return outcome;
+  }
+
+  async listResources(connectionId: string): Promise<ResourceDescriptor[]> {
+    return (await this.requireConnected(connectionId).connection.listResources()).map((r) => ({
+      uri: r.uri,
+      name: r.name,
+      title: r.title,
+      description: r.description,
+      mimeType: r.mimeType,
+      size: r.size,
+    }));
+  }
+
+  async listResourceTemplates(connectionId: string): Promise<ResourceTemplateDescriptor[]> {
+    const connection = this.requireConnected(connectionId).connection;
+    // Many servers advertise `resources` but don't implement
+    // `resources/templates/list` — treat that (and any RPC-level error here)
+    // as "no templates" rather than failing the whole panel.
+    const templates = await connection.listResourceTemplates().catch((cause: unknown) => {
+      if (cause instanceof McpError) return [];
+      throw cause;
+    });
+    return templates.map((t) => ({
+      uriTemplate: t.uriTemplate,
+      name: t.name,
+      title: t.title,
+      description: t.description,
+      mimeType: t.mimeType,
+    }));
+  }
+
+  async readResource(connectionId: string, uri: string): Promise<ReadResourceResult> {
+    return this.requireConnected(connectionId).connection.readResource(uri);
   }
 
   async rawRequest(

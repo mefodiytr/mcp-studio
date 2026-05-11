@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
 import { HistoryPanel } from '@renderer/features/history/HistoryPanel';
 import { RawConsole } from '@renderer/features/raw/RawConsole';
+import { ResourcesBrowser } from '@renderer/features/resources/ResourcesBrowser';
 import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
 
 import { LeftRail, type AppView } from './LeftRail';
@@ -24,6 +25,8 @@ export function AppShell() {
         <main className="min-h-0 flex-1 overflow-auto">
           {view === 'tools' ? (
             <ToolsCatalog />
+          ) : view === 'resources' ? (
+            <ResourcesBrowser />
           ) : view === 'history' ? (
             <HistoryPanel />
           ) : view === 'raw' ? (

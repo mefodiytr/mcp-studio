@@ -3,6 +3,11 @@ import { z } from 'zod';
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { protocolEventSchema } from '../domain/protocol';
+import {
+  readResourceResultSchema,
+  resourceDescriptorSchema,
+  resourceTemplateDescriptorSchema,
+} from '../domain/resource';
 import { toolHistoryEntrySchema } from '../domain/tool-history';
 import { rawRequestOutcomeSchema, toolCallOutcomeSchema } from '../domain/tool-result';
 
@@ -99,6 +104,18 @@ export const invokeChannels = {
       params: z.record(z.unknown()).optional(),
     }),
     response: rawRequestOutcomeSchema,
+  },
+  'connections:resources': {
+    request: z.object({ connectionId: z.string() }),
+    response: z.object({ resources: z.array(resourceDescriptorSchema) }),
+  },
+  'connections:resourceTemplates': {
+    request: z.object({ connectionId: z.string() }),
+    response: z.object({ templates: z.array(resourceTemplateDescriptorSchema) }),
+  },
+  'connections:readResource': {
+    request: z.object({ connectionId: z.string(), uri: z.string() }),
+    response: readResourceResultSchema,
   },
 
   // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────

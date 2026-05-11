@@ -22,6 +22,7 @@
   "tabs": {
     "connections": "Connections",
     "tools": "Tools",
+    "resources": "Resources",
     "history": "History",
     "raw": "Raw JSON-RPC",
     "newView": "New view"
@@ -59,6 +60,25 @@
       "destructiveHint": "destructive",
       "idempotentHint": "idempotent"
     }
+  },
+  "resources": {
+    "title": "Resources",
+    "search": "Search resources…",
+    "loading": "Loading resources…",
+    "loadError": "Couldn't load resources.",
+    "empty": "This server exposes no resources.",
+    "noConnection": "Connect a server to browse its resources.",
+    "static": "Resources",
+    "templates": "Templates",
+    "selectHint": "Select a resource or template to preview it.",
+    "noVars": "This template has no variables — read it directly.",
+    "resolve": "Resolve",
+    "read": "Read",
+    "reading": "Reading…",
+    "showRaw": "View raw JSON-RPC",
+    "hideRaw": "Hide raw JSON-RPC",
+    "emptyResult": "(no contents)",
+    "download": "Download"
   },
   "connections": {
     "savedServers": "Saved servers",
