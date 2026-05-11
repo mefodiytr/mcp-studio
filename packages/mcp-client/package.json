@@ -1,0 +1,23 @@
+{
+  "name": "@mcp-studio/mcp-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin, typed wrapper around @modelcontextprotocol/sdk — connection lifecycle, transports, capabilities.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server-everything": "^2026.1.26",
+    "vitest": "^2.1.9"
+  }
+}
