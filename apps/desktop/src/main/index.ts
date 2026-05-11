@@ -1,7 +1,12 @@
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL'];
+// Automation hook: when set, capture the rendered window to this PNG path once
+// the renderer has loaded, then quit. Used for screenshots and CI smoke checks;
+// no effect during normal use.
+const CAPTURE_PATH = process.env['MCPSTUDIO_CAPTURE_PATH'];
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -34,6 +39,17 @@ function createMainWindow(): BrowserWindow {
     void window.loadURL(RENDERER_DEV_URL);
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'));
+  }
+
+  if (CAPTURE_PATH) {
+    window.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        void window.webContents.capturePage().then((image) => {
+          writeFileSync(CAPTURE_PATH, image.toPNG());
+          app.quit();
+        });
+      }, 2500);
+    });
   }
 
   return window;

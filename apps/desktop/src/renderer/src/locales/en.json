@@ -1,0 +1,43 @@
+{
+  "app": {
+    "name": "MCP Studio",
+    "tagline": "A desktop client for the Model Context Protocol"
+  },
+  "nav": {
+    "servers": "Servers",
+    "tools": "Tools",
+    "resources": "Resources",
+    "prompts": "Prompts",
+    "inspector": "Protocol inspector",
+    "settings": "Settings"
+  },
+  "theme": {
+    "label": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "tabs": {
+    "welcome": "Welcome",
+    "newView": "New view"
+  },
+  "welcome": {
+    "title": "Welcome to MCP Studio",
+    "noConnection": "No server connected.",
+    "connectCta": "Connect a server",
+    "connectSoon": "Connection wizard arrives in C10",
+    "milestone": "Milestone 1 — Foundation",
+    "shellReady": "Electron · Vite · React · TypeScript shell, design system, command palette mount point."
+  },
+  "status": {
+    "notConnected": "Not connected",
+    "capabilities": "{{tools}} tools · {{resources}} resources · {{prompts}} prompts"
+  },
+  "commandPalette": {
+    "title": "Command palette",
+    "placeholder": "Type a command…",
+    "note": "Fuzzy search and view-contributed commands arrive in C21.",
+    "toggleTheme": "Toggle theme",
+    "reloadWindow": "Reload window"
+  }
+}
