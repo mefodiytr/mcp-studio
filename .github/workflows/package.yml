@@ -1,0 +1,35 @@
+name: Package
+
+# Builds unsigned desktop artifacts on a tag push or on demand. No code signing
+# / notarization in M1 (electron-builder.yml: mac.identity = null).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  package:
+    name: package (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcp-studio/desktop dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-studio-${{ matrix.os }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.dmg
+          if-no-files-found: warn
+          retention-days: 14

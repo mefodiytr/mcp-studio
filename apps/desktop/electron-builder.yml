@@ -1,0 +1,28 @@
+# Unsigned, smoke-only packaging for M1 — no code signing or notarization.
+# `pnpm --filter @mcp-studio/desktop dist` runs `electron-vite build` then this.
+appId: com.mcpstudio.app
+productName: MCP Studio
+copyright: © Mikhail (mefodiytr)
+directories:
+  output: release
+  buildResources: build
+# electron-vite emits the app into out/ (main / preload / renderer); the only
+# runtime deps are the few the main bundle keeps external (see externalizeDepsPlugin).
+files:
+  - out/**
+  - package.json
+  - '!**/{.DS_Store,.git,*.map}'
+asar: true
+npmRebuild: false
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+mac:
+  target: dmg
+  identity: null # explicitly unsigned for M1
+linux:
+  target: AppImage
+  category: Development

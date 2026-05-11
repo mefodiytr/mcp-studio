@@ -39,3 +39,6 @@ Thumbs.db
 
 # Local-only
 *.local
+
+# electron-builder
+builder-debug.yml

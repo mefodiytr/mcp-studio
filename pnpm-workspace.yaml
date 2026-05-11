@@ -4,6 +4,12 @@ packages:
   - 'plugins/*'
   - 'tests/fixtures/*'
 
+# Electron + electron-builder want a flat (hoisted) node_modules — the packaged
+# app's runtime deps must be a plain tree, not pnpm's symlinked store. pnpm 11
+# reads this from pnpm-workspace.yaml (the .npmrc `node-linker` setting was not
+# being picked up across the workspace).
+nodeLinker: hoisted
+
 # Postinstall/build scripts allowed to run (pnpm blocks all by default).
 # electron — extracts the prebuilt Electron binary; esbuild — installs its native binary.
 onlyBuiltDependencies:
