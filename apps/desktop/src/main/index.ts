@@ -22,6 +22,10 @@ import { createWorkspaceStore } from './store/workspace-store';
 // scoped package name.
 app.setName('MCP Studio');
 
+// Test/CI hook: run against a throwaway profile + config store.
+const USER_DATA_OVERRIDE = process.env['MCPSTUDIO_USER_DATA'];
+if (USER_DATA_OVERRIDE) app.setPath('userData', USER_DATA_OVERRIDE);
+
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL'];
 // Automation hook: when set, capture the rendered window to this PNG path once
 // the renderer has loaded, then quit. Used for screenshots and CI smoke checks;

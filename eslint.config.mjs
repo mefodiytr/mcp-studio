@@ -12,6 +12,8 @@ export default tseslint.config(
       '**/release/**',
       '**/.vite/**',
       '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
       'prototypes/**',
     ],
   },
