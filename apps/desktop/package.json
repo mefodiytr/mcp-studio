@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@mcp-studio/mcp-client": "workspace:*",
+    "@mcp-studio/schema-form": "workspace:*",
     "@radix-ui/react-dialog": "^1.1.15",
     "@tanstack/react-query": "^5.100.9",
     "class-variance-authority": "^0.7.1",

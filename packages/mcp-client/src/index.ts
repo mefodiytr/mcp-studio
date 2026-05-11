@@ -1,5 +1,6 @@
 export { Connection } from './connection';
 export type { ConnectionOptions, MessageDirection, MessageTap, TransportConfig } from './connection';
+export { McpError } from '@modelcontextprotocol/sdk/types.js';
 
 // Re-export the SDK types consumers commonly need, so they can stay off the
 // raw '@modelcontextprotocol/sdk/...' import paths.

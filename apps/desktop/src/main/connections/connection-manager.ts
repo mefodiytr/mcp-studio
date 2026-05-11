@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { Connection, type TransportConfig } from '@mcp-studio/mcp-client';
+import { Connection, McpError, type TransportConfig } from '@mcp-studio/mcp-client';
 
 import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
+import type { ToolCallOutcome } from '../../shared/domain/tool-result';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
@@ -146,17 +147,37 @@ export class ConnectionManager {
   }
 
   async listTools(connectionId: string): Promise<ToolDescriptor[]> {
-    const managed = this.connections.get(connectionId);
-    if (!managed || managed.summary.status !== 'connected') {
-      throw new Error(`Connection ${connectionId} is not available`);
-    }
-    return (await managed.connection.listTools()).map((tool) => ({
+    return (await this.requireConnected(connectionId).listTools()).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
       inputSchema: tool.inputSchema,
       annotations: tool.annotations,
     }));
+  }
+
+  async callTool(
+    connectionId: string,
+    toolName: string,
+    args?: Record<string, unknown>,
+  ): Promise<ToolCallOutcome> {
+    const connection = this.requireConnected(connectionId);
+    try {
+      return { result: await connection.callTool(toolName, args), error: null };
+    } catch (cause) {
+      if (cause instanceof McpError) {
+        return { result: null, error: { code: cause.code, message: cause.message, data: cause.data } };
+      }
+      return { result: null, error: { message: cause instanceof Error ? cause.message : String(cause) } };
+    }
+  }
+
+  private requireConnected(connectionId: string): Connection {
+    const managed = this.connections.get(connectionId);
+    if (!managed || managed.summary.status !== 'connected') {
+      throw new Error(`Connection ${connectionId} is not available`);
+    }
+    return managed.connection;
   }
 
   private async pollLatency(): Promise<void> {

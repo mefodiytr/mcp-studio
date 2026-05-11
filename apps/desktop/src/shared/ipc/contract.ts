@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { protocolEventSchema } from '../domain/protocol';
+import { toolCallOutcomeSchema } from '../domain/tool-result';
 
 /**
  * The single source of truth for the renderer ↔ main IPC surface.
@@ -81,6 +82,14 @@ export const invokeChannels = {
   'connections:tools': {
     request: z.object({ connectionId: z.string() }),
     response: z.object({ tools: z.array(toolDescriptorSchema) }),
+  },
+  'connections:call': {
+    request: z.object({
+      connectionId: z.string(),
+      toolName: z.string(),
+      args: z.record(z.unknown()).optional(),
+    }),
+    response: toolCallOutcomeSchema,
   },
 
   // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────

@@ -25,6 +25,9 @@ export default defineConfig({
         ...sharedAlias,
         '@renderer': resolve('src/renderer/src'),
       },
+      // Single React instance even though workspace packages (schema-form) bring
+      // their own react-hook-form etc.
+      dedupe: ['react', 'react-dom'],
     },
     plugins: [react(), tailwindcss()],
   },

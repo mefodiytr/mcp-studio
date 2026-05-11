@@ -41,8 +41,10 @@ function fieldDescription(field: FieldNode): string | undefined {
 }
 
 export interface SchemaFormProps {
-  /** A raw JSON Schema (compiled internally) — or a pre-compiled form. */
-  schema?: JsonSchema;
+  /** A raw JSON Schema (compiled internally) — or a pre-compiled form. Accepts
+   *  `unknown` for ergonomics; anything that isn't a schema object compiles to
+   *  the JSON escape hatch. */
+  schema?: unknown;
   compiled?: CompiledForm;
   /** Receives the validated form value. For a non-object root schema, the value
    *  is the leaf itself (unwrapped). */
@@ -53,7 +55,10 @@ export interface SchemaFormProps {
 }
 
 export function SchemaForm({ schema, compiled, onSubmit, submitLabel = 'Submit', busy = false }: SchemaFormProps) {
-  const form = useMemo<CompiledForm>(() => compiled ?? compileSchema(schema ?? {}), [compiled, schema]);
+  const form = useMemo<CompiledForm>(
+    () => compiled ?? compileSchema((schema ?? {}) as JsonSchema),
+    [compiled, schema],
+  );
   const rootIsObject = form.field.kind === 'object';
 
   const validator: z.ZodTypeAny = rootIsObject ? form.validator : z.object({ value: form.validator });

@@ -9,6 +9,8 @@ import { useTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
 import type { ToolDescriptor } from '@shared/domain/connection';
 
+import { ToolInvocationDialog } from './ToolInvocationDialog';
+
 type AnnotationFilter = 'readOnlyHint' | 'destructiveHint' | 'idempotentHint';
 const ANNOTATION_FILTERS: AnnotationFilter[] = ['readOnlyHint', 'destructiveHint', 'idempotentHint'];
 
@@ -22,6 +24,7 @@ export function ToolsCatalog() {
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReadonlySet<AnnotationFilter>>(new Set());
+  const [invoking, setInvoking] = useState<ToolDescriptor | null>(null);
   const toggle = (f: AnnotationFilter): void =>
     setFilters((prev) => {
       const next = new Set(prev);
@@ -101,17 +104,28 @@ export function ToolsCatalog() {
 
       <ul className="flex flex-col gap-3">
         {visible.map((tool) => (
-          <ToolRow key={tool.name} tool={tool} />
+          <ToolRow key={tool.name} tool={tool} onCall={() => setInvoking(tool)} />
         ))}
         {!toolsQuery.isLoading && visible.length === 0 && (
           <li className="text-sm text-muted-foreground">{t('tools.empty')}</li>
         )}
       </ul>
+
+      {invoking && activeId && (
+        <ToolInvocationDialog
+          connectionId={activeId}
+          tool={invoking}
+          open
+          onOpenChange={(o) => {
+            if (!o) setInvoking(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ToolRow({ tool }: { tool: ToolDescriptor }) {
+function ToolRow({ tool, onCall }: { tool: ToolDescriptor; onCall: () => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const badges: { label: string; destructive?: boolean }[] = [];
@@ -148,7 +162,7 @@ function ToolRow({ tool }: { tool: ToolDescriptor }) {
             <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
             {t('tools.schema')}
           </Button>
-          <Button size="sm" disabled title={t('tools.callSoon')}>
+          <Button size="sm" onClick={onCall}>
             {t('tools.call')}
           </Button>
         </div>
