@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
+import { getPromptResultSchema, promptDescriptorSchema } from '../domain/prompt';
 import { protocolEventSchema } from '../domain/protocol';
 import {
   readResourceResultSchema,
@@ -116,6 +117,18 @@ export const invokeChannels = {
   'connections:readResource': {
     request: z.object({ connectionId: z.string(), uri: z.string() }),
     response: readResourceResultSchema,
+  },
+  'connections:prompts': {
+    request: z.object({ connectionId: z.string() }),
+    response: z.object({ prompts: z.array(promptDescriptorSchema) }),
+  },
+  'connections:getPrompt': {
+    request: z.object({
+      connectionId: z.string(),
+      name: z.string(),
+      args: z.record(z.string()).optional(),
+    }),
+    response: getPromptResultSchema,
   },
 
   // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────

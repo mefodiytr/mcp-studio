@@ -23,6 +23,7 @@
     "connections": "Connections",
     "tools": "Tools",
     "resources": "Resources",
+    "prompts": "Prompts",
     "history": "History",
     "raw": "Raw JSON-RPC",
     "newView": "New view"
@@ -79,6 +80,22 @@
     "hideRaw": "Hide raw JSON-RPC",
     "emptyResult": "(no contents)",
     "download": "Download"
+  },
+  "prompts": {
+    "title": "Prompts",
+    "search": "Search prompts…",
+    "loading": "Loading prompts…",
+    "loadError": "Couldn't load prompts.",
+    "empty": "This server exposes no prompts.",
+    "noConnection": "Connect a server to browse its prompts.",
+    "selectHint": "Select a prompt to fill its arguments and preview it.",
+    "args": "args",
+    "preview": "Preview",
+    "previewing": "Assembling…",
+    "assembled": "Assembled messages",
+    "showRaw": "View raw JSON-RPC",
+    "hideRaw": "Hide raw JSON-RPC",
+    "emptyResult": "(no messages)"
   },
   "connections": {
     "savedServers": "Saved servers",

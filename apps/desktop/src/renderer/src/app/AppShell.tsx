@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
 import { HistoryPanel } from '@renderer/features/history/HistoryPanel';
+import { PromptsLibrary } from '@renderer/features/prompts/PromptsLibrary';
 import { RawConsole } from '@renderer/features/raw/RawConsole';
 import { ResourcesBrowser } from '@renderer/features/resources/ResourcesBrowser';
 import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
@@ -27,6 +28,8 @@ export function AppShell() {
             <ToolsCatalog />
           ) : view === 'resources' ? (
             <ResourcesBrowser />
+          ) : view === 'prompts' ? (
+            <PromptsLibrary />
           ) : view === 'history' ? (
             <HistoryPanel />
           ) : view === 'raw' ? (

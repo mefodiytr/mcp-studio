@@ -4,6 +4,7 @@ import { Connection, McpError, type TransportConfig } from '@mcp-studio/mcp-clie
 
 import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
+import type { GetPromptResult, PromptDescriptor } from '../../shared/domain/prompt';
 import type {
   ReadResourceResult,
   ResourceDescriptor,
@@ -234,6 +235,27 @@ export class ConnectionManager {
 
   async readResource(connectionId: string, uri: string): Promise<ReadResourceResult> {
     return this.requireConnected(connectionId).connection.readResource(uri);
+  }
+
+  async listPrompts(connectionId: string): Promise<PromptDescriptor[]> {
+    return (await this.requireConnected(connectionId).connection.listPrompts()).map((p) => ({
+      name: p.name,
+      title: p.title,
+      description: p.description,
+      arguments: p.arguments?.map((a) => ({
+        name: a.name,
+        description: a.description,
+        required: a.required,
+      })),
+    }));
+  }
+
+  async getPrompt(
+    connectionId: string,
+    name: string,
+    args?: Record<string, string>,
+  ): Promise<GetPromptResult> {
+    return this.requireConnected(connectionId).connection.getPrompt(name, args);
   }
 
   async rawRequest(

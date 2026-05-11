@@ -24,4 +24,8 @@ export function registerConnectionHandlers(manager: ConnectionManager): void {
     templates: await manager.listResourceTemplates(connectionId),
   }));
   handle('connections:readResource', ({ connectionId, uri }) => manager.readResource(connectionId, uri));
+  handle('connections:prompts', async ({ connectionId }) => ({
+    prompts: await manager.listPrompts(connectionId),
+  }));
+  handle('connections:getPrompt', ({ connectionId, name, args }) => manager.getPrompt(connectionId, name, args));
 }
