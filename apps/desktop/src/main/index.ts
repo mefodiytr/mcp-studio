@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, safeStorage, shell } from 'electron';
 
 import { ConnectionManager } from './connections/connection-manager';
+import { StdioPidTracker } from './connections/pid-tracker';
 import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ipc';
 import { registerConnectionHandlers } from './ipc/connections';
 import { registerCredentialHandlers } from './ipc/credentials';
@@ -118,7 +119,15 @@ if (!gotSingleInstanceLock) {
     }
     const vault = new CredentialVault(createCredentialVaultStore(userData), cipher);
 
-    connectionManager = new ConnectionManager(profiles, vault, (connections) =>
+    const pidTracker = new StdioPidTracker(userData);
+    const orphans = pidTracker.reapOrphans();
+    if (orphans.length > 0) {
+      console.warn(
+        `[connections] ${orphans.length} stdio server(s) from a previous session may still be running: ` +
+          orphans.map((o) => o.pid).join(', '),
+      );
+    }
+    connectionManager = new ConnectionManager(profiles, vault, pidTracker, (connections) =>
       emitToRenderers('connections:changed', { connections }),
     );
 
@@ -135,12 +144,15 @@ if (!gotSingleInstanceLock) {
     });
   });
 
-  app.on('will-quit', () => {
-    stopDemoEvents?.();
-    // Fire-and-forget: close live sessions (kills stdio child processes).
-    // TODO(C8/C9): harden child-process lifecycle (job objects on Windows).
-    void connectionManager?.disconnectAll();
-  });
+  // Graceful-exit cleanup: synchronously force-kill any tracked stdio children
+  // (covers normal quit, Ctrl-C, app.quit()). A hard crash of the main process
+  // can still leave orphans — detected on the next launch, see StdioPidTracker;
+  // job-object-based hard-crash survival is intentionally out of M1 scope.
+  app.on('before-quit', () => connectionManager?.killAllStdioChildren());
+  app.on('will-quit', () => stopDemoEvents?.());
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => app.quit());
+  }
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();

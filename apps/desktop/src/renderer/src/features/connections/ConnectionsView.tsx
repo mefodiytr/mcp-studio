@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Plug, Server, Unplug } from 'lucide-react';
+import { Loader2, Plug, RotateCw, Server, Unplug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
-import { connectProfile, disconnectConnection, fetchTools, useConnections } from '@renderer/lib/connections';
+import {
+  connectProfile,
+  disconnectConnection,
+  fetchTools,
+  reconnectConnection,
+  useConnections,
+} from '@renderer/lib/connections';
+import { cn } from '@renderer/lib/utils';
 import type { ConnectionSummary, ToolSummary } from '@shared/domain/connection';
 
 const DEV_PROFILE_NAME = 'server-everything (dev)';
@@ -98,8 +105,13 @@ export function ConnectionsView() {
 function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
   const { t } = useTranslation();
   const [tools, setTools] = useState<ToolSummary[]>([]);
+  const errored = connection.status === 'error';
 
   useEffect(() => {
+    if (errored) {
+      setTools([]);
+      return;
+    }
     let cancelled = false;
     void fetchTools(connection.connectionId).then((list) => {
       if (!cancelled) setTools(list);
@@ -107,26 +119,41 @@ function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
     return () => {
       cancelled = true;
     };
-  }, [connection.connectionId]);
+  }, [connection.connectionId, errored]);
 
   return (
     <li className="rounded-lg border bg-card p-4 text-card-foreground">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-medium">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 font-medium">
+            <span
+              className={cn('size-1.5 shrink-0 rounded-full', errored ? 'bg-destructive' : 'bg-emerald-500')}
+              aria-hidden
+            />
             {connection.serverInfo?.name ?? t('connections.unknownServer')}{' '}
             <span className="text-muted-foreground">{connection.serverInfo?.version}</span>
           </p>
           <p className="text-xs text-muted-foreground">
-            {connection.transportKind} · {connection.capabilities.tools} {t('connections.tools')} ·{' '}
-            {connection.capabilities.resources} {t('connections.resources')} · {connection.capabilities.prompts}{' '}
-            {t('connections.prompts')}
+            {connection.transportKind}
+            {connection.latencyMs != null && ` · ${Math.round(connection.latencyMs)} ms`}
+            {' · '}
+            {connection.capabilities.tools} {t('connections.tools')} · {connection.capabilities.resources}{' '}
+            {t('connections.resources')} · {connection.capabilities.prompts} {t('connections.prompts')}
           </p>
+          {errored && connection.error && <p className="mt-1 text-xs text-destructive">{connection.error}</p>}
         </div>
-        <Button size="sm" variant="ghost" onClick={() => void disconnectConnection(connection.connectionId)}>
-          <Unplug />
-          {t('connections.disconnect')}
-        </Button>
+        <div className="flex shrink-0 gap-1">
+          {errored && (
+            <Button size="sm" variant="outline" onClick={() => void reconnectConnection(connection.connectionId)}>
+              <RotateCw />
+              {t('connections.reconnect')}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => void disconnectConnection(connection.connectionId)}>
+            <Unplug />
+            {t('connections.disconnect')}
+          </Button>
+        </div>
       </div>
       {tools.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">

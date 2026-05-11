@@ -53,7 +53,8 @@ Credentials (Bearer tokens, header values) stored via `safeStorage` keyed by pro
 
 ### C8 — `feat: HTTP transport + connection manager`
 Streamable HTTP transport adapter (+ SSE-legacy fallback if cheap) wired into `mcp-client`. Main-process `ConnectionManager` holding live connections keyed by profile id, exposed via IPC (connect/disconnect/status). Multiple simultaneous connections.
-**AC:** connect two profiles at once; status events stream to renderer; disconnect cleans up; reconnect works; latency measured per request.
+**stdio lifecycle hardening** (part of "full" C8, not a separate commit): (1) graceful-exit cleanup — synchronous force-kill of tracked stdio children on quit (`taskkill /F /T` on Windows; SIGKILL elsewhere) on `before-quit` + SIGINT/SIGTERM → `app.quit()`; (2) `Connection.close()` races a ~2 s timeout → force-kills a stdio child that ignores graceful shutdown; (3) `StdioPidTracker` — records child PIDs in `userData/active-pids.json` so a hard crash that bypassed (1) is *detected* (orphans reported in a console warning) on the next launch. Job-object-based hard-crash *survival* is intentionally out of M1 scope (needs a native addon — the better-sqlite3-style cost we deliberately avoid in the foundation); **re-evaluate at ~M3**, when write-tool batches mean long sessions and the orphan rate becomes visible. (The HTTP transport is wired; a streamableHttp integration test against server-everything lands with the reference-server fixture in C23.)
+**AC:** connect two profiles at once; status events stream to renderer; disconnect cleans up; reconnect works; latency sampled at connect time (per-request timing arrives with the protocol tap in C9).
 
 ### C9 — `feat: protocol event tap`
 Every JSON-RPC request/response/notification (+ HTTP-level errors) emitted on an IPC event channel with `{connectionId, direction, method, id, ts, durationMs, payload}`; ring-buffered in main (configurable cap).

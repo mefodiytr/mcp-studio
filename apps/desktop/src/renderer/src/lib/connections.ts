@@ -15,6 +15,11 @@ export async function connectProfile(profileId: string): Promise<ConnectionSumma
   return window.studio.invoke('connections:connect', { profileId });
 }
 
+export async function reconnectConnection(connectionId: string): Promise<ConnectionSummary> {
+  if (!window.studio) throw new Error('IPC bridge unavailable');
+  return window.studio.invoke('connections:reconnect', { connectionId });
+}
+
 export async function disconnectConnection(connectionId: string): Promise<void> {
   await window.studio?.invoke('connections:disconnect', { connectionId });
 }

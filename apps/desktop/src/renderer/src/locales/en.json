@@ -27,6 +27,7 @@
     "empty": "No MCP server connected.",
     "proofOfLife": "Milestone 1 — Foundation · proof of life",
     "disconnect": "Disconnect",
+    "reconnect": "Reconnect",
     "unknownServer": "Unknown server",
     "tools": "tools",
     "resources": "resources",

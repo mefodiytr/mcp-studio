@@ -50,6 +50,8 @@ function createTransport(config: TransportConfig, options: ConnectionOptions): T
   }
 }
 
+const CLOSE_TIMEOUT_MS = 2_000;
+
 /**
  * A live MCP session: wraps an SDK `Client` plus its transport. Transport-
  * agnostic (HTTP / SSE / stdio). The main process owns these; the renderer
@@ -58,6 +60,7 @@ function createTransport(config: TransportConfig, options: ConnectionOptions): T
 export class Connection {
   private constructor(
     private readonly client: Client,
+    private readonly transport: Transport,
     /** Which transport this connection is using. */
     readonly transportKind: TransportConfig['transport'],
   ) {}
@@ -67,7 +70,19 @@ export class Connection {
     const client = new Client(options.clientInfo ?? DEFAULT_CLIENT_INFO, { capabilities: {} });
     const transport = createTransport(config, options);
     await client.connect(transport);
-    return new Connection(client, config.transport);
+    return new Connection(client, transport, config.transport);
+  }
+
+  /** PID of the spawned server, for stdio connections (else undefined). */
+  get childPid(): number | undefined {
+    return this.transport instanceof StdioClientTransport ? this.transport.pid ?? undefined : undefined;
+  }
+
+  /** Round-trip latency of an MCP `ping`, in milliseconds. */
+  async ping(): Promise<number> {
+    const startedAt = performance.now();
+    await this.client.ping();
+    return performance.now() - startedAt;
   }
 
   /** The server's reported implementation (name/version), once connected. */
@@ -124,7 +139,24 @@ export class Connection {
     this.client.onerror = callback;
   }
 
+  /** Close the session. Races a timeout; if a stdio child ignores the graceful
+   *  shutdown it is force-killed. */
   async close(): Promise<void> {
-    await this.client.close();
+    let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), CLOSE_TIMEOUT_MS);
+    });
+    try {
+      const outcome = await Promise.race([this.client.close().then(() => 'closed' as const), timeout]);
+      if (outcome === 'timeout' && this.childPid !== undefined) {
+        try {
+          process.kill(this.childPid, 'SIGKILL');
+        } catch {
+          // already gone
+        }
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 }

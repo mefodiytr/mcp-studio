@@ -69,6 +69,10 @@ export const invokeChannels = {
     request: z.object({ profileId: z.string() }),
     response: connectionSummarySchema,
   },
+  'connections:reconnect': {
+    request: z.object({ connectionId: z.string() }),
+    response: connectionSummarySchema,
+  },
   'connections:disconnect': {
     request: z.object({ connectionId: z.string() }),
     response: z.object({ connectionId: z.string() }),
