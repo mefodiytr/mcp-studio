@@ -1,79 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useTheme } from '@renderer/lib/theme';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@renderer/components/ui/command';
+import type { Command } from '@renderer/lib/commands';
 
-interface PaletteItem {
-  label: string;
-  run: () => void;
+const RECENTS_KEY = 'mcp-studio.command-recents';
+const MAX_RECENTS = 8;
+
+function loadRecents(): string[] {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(RECENTS_KEY) ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
- * Command-palette mount point. C21 replaces the body with a cmdk-powered
- * fuzzy palette that aggregates view-contributed commands; for now this is a
- * minimal Ctrl/⌘+K modal with the few commands that already work, so the
- * keybinding and surface exist from day one.
+ * The `Ctrl/⌘+K` command palette: a cmdk-powered fuzzy list over the commands
+ * the shell builds (`useAppCommands`), with a "Recent" group persisted to
+ * localStorage. Escape and a second Ctrl+K close it.
  */
-export function CommandPalette() {
+export function CommandPalette({ commands }: { commands: Command[] }) {
   const { t } = useTranslation();
-  const { cycleTheme } = useTheme();
   const [open, setOpen] = useState(false);
+  const [recents, setRecents] = useState<string[]>(loadRecents);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setOpen((value) => !value);
-      } else if (event.key === 'Escape') {
-        setOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  if (!open) return null;
+  const visible = useMemo(() => commands.filter((c) => c.when !== false), [commands]);
 
-  const items: PaletteItem[] = [
-    { label: t('commandPalette.toggleTheme'), run: cycleTheme },
-    { label: t('commandPalette.reloadWindow'), run: () => window.location.reload() },
-  ];
+  const { recentCommands, grouped } = useMemo(() => {
+    const byId = new Map(visible.map((c) => [c.id, c]));
+    const recentIds = new Set(recents.filter((id) => byId.has(id)));
+    const recentCmds = recents.map((id) => byId.get(id)).filter((c): c is Command => Boolean(c));
+    const groups = new Map<string, Command[]>();
+    for (const c of visible) {
+      if (recentIds.has(c.id)) continue;
+      const arr = groups.get(c.group) ?? [];
+      arr.push(c);
+      groups.set(c.group, arr);
+    }
+    return { recentCommands: recentCmds, grouped: [...groups.entries()] };
+  }, [visible, recents]);
+
+  const run = (command: Command): void => {
+    setOpen(false);
+    setRecents((prev) => {
+      const next = [command.id, ...prev.filter((id) => id !== command.id)].slice(0, MAX_RECENTS);
+      try {
+        localStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+      } catch {
+        /* localStorage unavailable — recents are best-effort */
+      }
+      return next;
+    });
+    void command.run();
+  };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[15vh]"
-      role="presentation"
-      onClick={() => setOpen(false)}
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title={t('commandPalette.title')}
+      description={t('commandPalette.placeholder')}
     >
-      <div
-        className="w-full max-w-lg overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg"
-        role="dialog"
-        aria-label={t('commandPalette.title')}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <input
-          autoFocus
-          placeholder={t('commandPalette.placeholder')}
-          className="w-full border-b bg-transparent px-4 py-3 text-sm outline-none placeholder:text-muted-foreground"
-        />
-        <ul className="max-h-72 overflow-auto p-1">
-          {items.map((item) => (
-            <li key={item.label}>
-              <button
-                type="button"
-                className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-                onClick={() => {
-                  item.run();
-                  setOpen(false);
-                }}
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <p className="border-t px-4 py-2 text-xs text-muted-foreground">{t('commandPalette.note')}</p>
-      </div>
-    </div>
+      <CommandInput placeholder={t('commandPalette.placeholder')} />
+      <CommandList>
+        <CommandEmpty>{t('commandPalette.empty')}</CommandEmpty>
+        {recentCommands.length > 0 && (
+          <>
+            <CommandGroup heading={t('commandPalette.recents')}>
+              {recentCommands.map((c) => (
+                <CommandItem key={c.id} value={`${c.title} ${c.keywords ?? ''}`} onSelect={() => run(c)}>
+                  {c.title}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
+        {grouped.map(([group, cmds]) => (
+          <CommandGroup key={group} heading={group}>
+            {cmds.map((c) => (
+              <CommandItem key={c.id} value={`${c.title} ${c.keywords ?? ''}`} onSelect={() => run(c)}>
+                {c.title}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </CommandDialog>
   );
 }

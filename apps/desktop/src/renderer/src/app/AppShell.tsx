@@ -7,7 +7,9 @@ import { PromptsLibrary } from '@renderer/features/prompts/PromptsLibrary';
 import { RawConsole } from '@renderer/features/raw/RawConsole';
 import { ResourcesBrowser } from '@renderer/features/resources/ResourcesBrowser';
 import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
+import { useAppCommands } from '@renderer/lib/commands';
 
+import { CommandPalette } from './CommandPalette';
 import { LeftRail, type AppView } from './LeftRail';
 import { TabBar } from './TabBar';
 import { StatusBar } from './StatusBar';
@@ -21,6 +23,7 @@ import { StatusBar } from './StatusBar';
 export function AppShell() {
   const [view, setView] = useState<AppView>('connections');
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const commands = useAppCommands({ view, setView, inspectorOpen, setInspectorOpen });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -35,6 +38,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full w-full bg-background text-foreground">
+      <CommandPalette commands={commands} />
       <LeftRail
         view={view}
         onSelect={setView}

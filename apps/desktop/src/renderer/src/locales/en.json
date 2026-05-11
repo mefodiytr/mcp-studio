@@ -149,6 +149,7 @@
     "tlsInsecureBadge": "TLS-insecure",
     "sessionId": "Session",
     "dropped": "{{name}} disconnected",
+    "connected": "{{name}} connected",
     "connectFailed": "Couldn't connect to {{name}}",
     "unknownServer": "Unknown server",
     "tools": "tools",
@@ -215,8 +216,23 @@
   "commandPalette": {
     "title": "Command palette",
     "placeholder": "Type a command…",
-    "note": "Fuzzy search and view-contributed commands arrive in C21.",
+    "empty": "No matching commands.",
+    "recents": "Recent",
+    "openView": "Open {{name}}",
+    "showInspector": "Show protocol inspector",
+    "hideInspector": "Hide protocol inspector",
+    "connectTo": "Connect to {{name}}",
+    "disconnectFrom": "Disconnect {{name}}",
+    "runLastTool": "Re-run last tool ({{name}})",
+    "clearHistory": "Clear tool-call history",
     "toggleTheme": "Toggle theme",
-    "reloadWindow": "Reload window"
+    "reloadWindow": "Reload window",
+    "group": {
+      "go": "Go to",
+      "view": "View",
+      "connections": "Connections",
+      "tools": "Tools",
+      "history": "History"
+    }
   }
 }
