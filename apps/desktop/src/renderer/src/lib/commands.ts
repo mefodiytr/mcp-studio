@@ -24,7 +24,7 @@ export interface Command {
 }
 
 interface ShellHandle {
-  view: AppView;
+  view: AppView | null;
   setView: (view: AppView) => void;
   inspectorOpen: boolean;
   setInspectorOpen: (open: boolean | ((open: boolean) => boolean)) => void;

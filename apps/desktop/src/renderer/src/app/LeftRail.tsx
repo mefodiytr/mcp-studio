@@ -36,7 +36,7 @@ export function LeftRail({
   inspectorOpen,
   onToggleInspector,
 }: {
-  view: AppView;
+  view: AppView | null;
   onSelect: (view: AppView) => void;
   inspectorOpen: boolean;
   onToggleInspector: () => void;

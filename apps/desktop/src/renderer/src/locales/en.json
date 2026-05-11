@@ -26,7 +26,11 @@
     "prompts": "Prompts",
     "history": "History",
     "raw": "Raw JSON-RPC",
-    "newView": "New view"
+    "newTab": "New tab",
+    "close": "Close tab",
+    "pin": "Pin tab",
+    "unpin": "Unpin tab",
+    "emptyHint": "No tabs open. Pick a view from the rail or the command palette (Ctrl+K)."
   },
   "tools": {
     "title": "Tools",
