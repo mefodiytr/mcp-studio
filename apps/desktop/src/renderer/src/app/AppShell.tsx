@@ -1,14 +1,8 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
-import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
-import { HistoryPanel } from '@renderer/features/history/HistoryPanel';
-import { ProtocolInspector } from '@renderer/features/inspector/ProtocolInspector';
-import { PromptsLibrary } from '@renderer/features/prompts/PromptsLibrary';
-import { RawConsole } from '@renderer/features/raw/RawConsole';
-import { ResourcesBrowser } from '@renderer/features/resources/ResourcesBrowser';
-import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
 import { useAppCommands } from '@renderer/lib/commands';
 import { useWorkspaceStore, type Tab } from '@renderer/stores/workspace';
 
@@ -16,6 +10,29 @@ import { CommandPalette } from './CommandPalette';
 import { LeftRail, type AppView } from './LeftRail';
 import { TabBar } from './TabBar';
 import { StatusBar } from './StatusBar';
+
+// Feature views are code-split: each ships as its own chunk (and pulls in its
+// own heavy deps — schema-form / react-hook-form / zod for the catalogs) so the
+// initial renderer bundle stays lean.
+const ConnectionsView = lazy(() =>
+  import('@renderer/features/connections/ConnectionsView').then((m) => ({ default: m.ConnectionsView })),
+);
+const ToolsCatalog = lazy(() =>
+  import('@renderer/features/tools/ToolsCatalog').then((m) => ({ default: m.ToolsCatalog })),
+);
+const ResourcesBrowser = lazy(() =>
+  import('@renderer/features/resources/ResourcesBrowser').then((m) => ({ default: m.ResourcesBrowser })),
+);
+const PromptsLibrary = lazy(() =>
+  import('@renderer/features/prompts/PromptsLibrary').then((m) => ({ default: m.PromptsLibrary })),
+);
+const HistoryPanel = lazy(() =>
+  import('@renderer/features/history/HistoryPanel').then((m) => ({ default: m.HistoryPanel })),
+);
+const RawConsole = lazy(() => import('@renderer/features/raw/RawConsole').then((m) => ({ default: m.RawConsole })));
+const ProtocolInspector = lazy(() =>
+  import('@renderer/features/inspector/ProtocolInspector').then((m) => ({ default: m.ProtocolInspector })),
+);
 
 function ViewForTab({ tab }: { tab: Tab }) {
   switch (tab.view) {
@@ -32,6 +49,14 @@ function ViewForTab({ tab }: { tab: Tab }) {
     case 'connections':
       return <ConnectionsView />;
   }
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex h-full items-center justify-center text-muted-foreground">
+      <Loader2 className="size-5 animate-spin" aria-hidden />
+    </div>
+  );
 }
 
 function WorkspaceEmpty({ onOpen }: { onOpen: (view: AppView) => void }) {
@@ -91,9 +116,15 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TabBar />
         <main className="min-h-0 flex-1 overflow-auto">
-          {activeTab ? <ViewForTab key={activeTab.id} tab={activeTab} /> : <WorkspaceEmpty onOpen={focusOrOpen} />}
+          <Suspense fallback={<LoadingFallback />}>
+            {activeTab ? <ViewForTab key={activeTab.id} tab={activeTab} /> : <WorkspaceEmpty onOpen={focusOrOpen} />}
+          </Suspense>
         </main>
-        {inspectorOpen && <ProtocolInspector onClose={() => setInspectorOpen(false)} />}
+        {inspectorOpen && (
+          <Suspense fallback={null}>
+            <ProtocolInspector onClose={() => setInspectorOpen(false)} />
+          </Suspense>
+        )}
         <StatusBar />
       </div>
     </div>
