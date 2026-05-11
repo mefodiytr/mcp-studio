@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import type { OAuthArtifacts } from '@mcp-studio/mcp-client';
+
 import { JsonStore } from './json-store';
 
 /**
@@ -16,15 +18,28 @@ export interface CredentialVaultData {
   schemaVersion: number;
   /** profileId → { enc: base64 of the encrypted secret, hint: "••••1234" }. */
   secrets: Record<string, { enc: string; hint: string }>;
+  /** profileId → { enc: base64 of the encrypted JSON of the profile's OAuth
+   *  artifacts (tokens + DCR client info). The whole blob is encrypted — it
+   *  carries the refresh token and possibly a client secret. */
+  oauth: Record<string, { enc: string }>;
 }
 
-const VAULT_VERSION = 1;
+const VAULT_VERSION = 2;
 
 export function createCredentialVaultStore(userDataDir: string): JsonStore<CredentialVaultData> {
   return new JsonStore<CredentialVaultData>({
     filePath: join(userDataDir, 'credentials.json'),
     version: VAULT_VERSION,
-    defaults: { schemaVersion: VAULT_VERSION, secrets: {} },
+    defaults: { schemaVersion: VAULT_VERSION, secrets: {}, oauth: {} },
+    migrate: (data) => {
+      // v1 → v2: add the `oauth` map. (v1 had only `schemaVersion` + `secrets`.)
+      const previous = data as Partial<CredentialVaultData>;
+      return {
+        schemaVersion: VAULT_VERSION,
+        secrets: previous.secrets ?? {},
+        oauth: previous.oauth ?? {},
+      };
+    },
   });
 }
 
@@ -72,6 +87,36 @@ export class CredentialVault {
   deleteSecret(profileId: string): void {
     if (this.store.data.secrets[profileId]) {
       delete this.store.data.secrets[profileId];
+      this.store.save();
+    }
+  }
+
+  // ── OAuth artifacts (tokens + DCR client info), encrypted as one JSON blob ──
+
+  /** The profile's stored OAuth artifacts, or an empty object if none. Main-only. */
+  getOAuthArtifacts(profileId: string): OAuthArtifacts {
+    const entry = this.store.data.oauth[profileId];
+    if (!entry) return {};
+    try {
+      return JSON.parse(this.cipher.decrypt(Buffer.from(entry.enc, 'base64'))) as OAuthArtifacts;
+    } catch {
+      return {};
+    }
+  }
+
+  setOAuthArtifacts(profileId: string, artifacts: OAuthArtifacts): void {
+    const enc = this.cipher.encrypt(JSON.stringify(artifacts)).toString('base64');
+    this.store.data.oauth[profileId] = { enc };
+    this.store.save();
+  }
+
+  hasOAuthArtifacts(profileId: string): boolean {
+    return profileId in this.store.data.oauth;
+  }
+
+  deleteOAuthArtifacts(profileId: string): void {
+    if (this.store.data.oauth[profileId]) {
+      delete this.store.data.oauth[profileId];
       this.store.save();
     }
   }

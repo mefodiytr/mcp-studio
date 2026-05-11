@@ -9,6 +9,7 @@ import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ip
 import { registerConnectionHandlers } from './ipc/connections';
 import { registerCredentialHandlers } from './ipc/credentials';
 import { registerHistoryHandlers } from './ipc/history';
+import { registerOAuthHandlers } from './ipc/oauth';
 import { registerProfileHandlers } from './ipc/profiles';
 import { registerProtocolHandlers } from './ipc/protocol';
 import { createConfigStore, type AppConfig } from './store/config-store';
@@ -151,6 +152,7 @@ if (!gotSingleInstanceLock) {
     registerIpcHandlers();
     registerProfileHandlers(profiles, vault);
     registerCredentialHandlers(profiles, vault);
+    registerOAuthHandlers(vault);
     registerConnectionHandlers(connectionManager);
     registerProtocolHandlers(protocolTap);
     registerHistoryHandlers(toolHistory);

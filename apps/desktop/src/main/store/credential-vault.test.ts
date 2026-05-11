@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -69,5 +69,51 @@ describe('CredentialVault', () => {
     expect(third.hasSecret('a')).toBe(false);
     expect(third.getSecret('b')).toBe('token-bbbb');
     expect(existsSync(join(dir, 'credentials.json'))).toBe(true);
+  });
+});
+
+describe('CredentialVault — OAuth artifacts', () => {
+  const artifacts = {
+    tokens: { access_token: 'at-secret', token_type: 'Bearer', refresh_token: 'rt-secret', expires_in: 3600 },
+    tokensSavedAt: 1_700_000_000_000,
+    clientInfo: { client_id: 'cid', client_secret: 'cs-secret' },
+  };
+
+  it('stores OAuth artifacts encrypted (no token/secret material in plaintext) and round-trips', () => {
+    const vault = makeVault();
+    expect(vault.getOAuthArtifacts('p')).toEqual({});
+    expect(vault.hasOAuthArtifacts('p')).toBe(false);
+
+    vault.setOAuthArtifacts('p', artifacts);
+    const raw = readFileSync(join(dir, 'credentials.json'), 'utf8');
+    expect(raw).not.toContain('at-secret');
+    expect(raw).not.toContain('rt-secret');
+    expect(raw).not.toContain('cs-secret');
+
+    expect(vault.hasOAuthArtifacts('p')).toBe(true);
+    expect(vault.getOAuthArtifacts('p')).toEqual(artifacts);
+
+    const reopened = makeVault();
+    expect(reopened.getOAuthArtifacts('p').tokens?.access_token).toBe('at-secret');
+    reopened.deleteOAuthArtifacts('p');
+    expect(makeVault().hasOAuthArtifacts('p')).toBe(false);
+  });
+
+  it('migrates a v1 credentials.json that has no `oauth` map', () => {
+    const v1 = {
+      schemaVersion: 1,
+      secrets: { p: { enc: Buffer.from('tok', 'utf8').toString('base64'), hint: '••••' } },
+    };
+    writeFileSync(join(dir, 'credentials.json'), `${JSON.stringify(v1, null, 2)}\n`);
+
+    const vault = makeVault(); // loads + migrates
+    expect(vault.getSecret('p')).toBe('tok');
+    expect(vault.hasOAuthArtifacts('p')).toBe(false);
+    vault.setOAuthArtifacts('p', { tokens: { access_token: 'x', token_type: 'Bearer' } });
+    expect(vault.getOAuthArtifacts('p').tokens?.access_token).toBe('x');
+
+    const onDisk = JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')) as Record<string, unknown>;
+    expect(onDisk['schemaVersion']).toBe(2);
+    expect(onDisk['oauth']).toBeDefined();
   });
 });

@@ -15,6 +15,9 @@ type StoredClientInformation = OAuthClientInformationMixed;
  *  `auth()` call and exposes no provider hook to cache it. */
 export interface OAuthArtifacts {
   tokens?: OAuthTokens;
+  /** `Date.now()` when `tokens` was last saved — used to turn the relative
+   *  `expires_in` into an absolute expiry (for the UI + proactive refresh). */
+  tokensSavedAt?: number;
   /** The dynamically-registered client (RFC 7591). Absent when a static
    *  `clientId` is configured instead, or before the first registration. */
   clientInfo?: StoredClientInformation;
@@ -94,7 +97,7 @@ export class StudioOAuthClientProvider implements OAuthClientProvider {
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await this.deps.save({ ...this.deps.load(), tokens });
+    await this.deps.save({ ...this.deps.load(), tokens, tokensSavedAt: Date.now() });
   }
 
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
@@ -114,7 +117,7 @@ export class StudioOAuthClientProvider implements OAuthClientProvider {
     if (scope === 'verifier' || scope === 'all') this.codeVerifierValue = undefined;
     if (scope === 'discovery') return; // not cached by us
     const current = this.deps.load();
-    if (scope === 'tokens') await this.deps.save({ ...current, tokens: undefined });
+    if (scope === 'tokens') await this.deps.save({ ...current, tokens: undefined, tokensSavedAt: undefined });
     else if (scope === 'client') await this.deps.save({ ...current, clientInfo: undefined });
     else if (scope === 'all') await this.deps.save({});
   }

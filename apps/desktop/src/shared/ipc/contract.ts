@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { oauthStatusSchema } from '../domain/auth';
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { getPromptResultSchema, promptDescriptorSchema } from '../domain/prompt';
@@ -65,6 +66,16 @@ export const invokeChannels = {
     response: z.object({ hint: z.string().nullable() }),
   },
   'credentials:clear': {
+    request: z.object({ profileId: z.string() }),
+    response: z.object({ profileId: z.string() }),
+  },
+
+  // ── OAuth (status is redacted; tokens never cross to the renderer) ─────────
+  'oauth:status': {
+    request: z.object({ profileId: z.string() }),
+    response: oauthStatusSchema,
+  },
+  'oauth:signOut': {
     request: z.object({ profileId: z.string() }),
     response: z.object({ profileId: z.string() }),
   },
