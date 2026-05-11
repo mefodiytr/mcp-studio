@@ -3,3 +3,12 @@ packages:
   - 'packages/*'
   - 'plugins/*'
   - 'tests/fixtures/*'
+
+# Postinstall/build scripts allowed to run (pnpm blocks all by default).
+# electron — extracts the prebuilt Electron binary; esbuild — installs its native binary.
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+allowBuilds:
+  electron: true
+  esbuild: true
