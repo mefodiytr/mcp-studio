@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "point": { "$ref": "#/$defs/point" }
+  },
+  "required": ["point"],
+  "$defs": {
+    "point": {
+      "type": "object",
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["x", "y"]
+    }
+  }
+}

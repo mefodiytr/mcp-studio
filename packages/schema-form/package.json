@@ -1,0 +1,22 @@
+{
+  "name": "@mcp-studio/schema-form",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Compiles a JSON Schema into a renderable field tree + a zod validator.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "vitest": "^2.1.9"
+  }
+}

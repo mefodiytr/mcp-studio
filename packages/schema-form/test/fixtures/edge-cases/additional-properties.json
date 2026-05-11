@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "a": { "type": "string", "description": "A known property" }
+  },
+  "additionalProperties": true
+}

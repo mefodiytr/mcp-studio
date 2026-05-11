@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "properties": {
+    "messageType": {
+      "type": "string",
+      "enum": ["error", "success", "debug"],
+      "description": "Type of message to demonstrate different annotation patterns"
+    },
+    "includeImage": { "type": "boolean", "default": false, "description": "Whether to include an example image" }
+  },
+  "required": ["messageType"]
+}

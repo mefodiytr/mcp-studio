@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "title": "readBql",
+  "properties": {
+    "ord": { "type": "string", "description": "Base ORD to run the query against" },
+    "bql": { "type": "string", "description": "BQL query, e.g. select displayName, out.value from control:NumericPoint" },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 100, "description": "Maximum rows to return" }
+  },
+  "required": ["ord", "bql"]
+}

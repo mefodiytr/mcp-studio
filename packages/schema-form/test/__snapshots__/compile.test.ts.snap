@@ -1,0 +1,335 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`compileSchema — fixture corpus (snapshots) > additional-properties.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "A known property",
+        "kind": "string",
+      },
+      "name": "a",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > defs-ref.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "allowsAdditional": true,
+        "fields": [
+          {
+            "field": {
+              "integer": false,
+              "kind": "number",
+            },
+            "name": "x",
+            "required": true,
+          },
+          {
+            "field": {
+              "integer": false,
+              "kind": "number",
+            },
+            "name": "y",
+            "required": true,
+          },
+        ],
+        "kind": "object",
+      },
+      "name": "point",
+      "required": true,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > discriminated-oneof.json 1`] = `
+{
+  "discriminator": "kind",
+  "kind": "union",
+  "variants": [
+    {
+      "field": {
+        "allowsAdditional": true,
+        "fields": [
+          {
+            "field": {
+              "kind": "const",
+              "value": "text",
+            },
+            "name": "kind",
+            "required": true,
+          },
+          {
+            "field": {
+              "kind": "string",
+            },
+            "name": "text",
+            "required": true,
+          },
+        ],
+        "kind": "object",
+        "title": "Text content",
+      },
+      "label": "Text content",
+    },
+    {
+      "field": {
+        "allowsAdditional": true,
+        "fields": [
+          {
+            "field": {
+              "kind": "const",
+              "value": "image",
+            },
+            "name": "kind",
+            "required": true,
+          },
+          {
+            "field": {
+              "format": "uri",
+              "kind": "string",
+            },
+            "name": "url",
+            "required": true,
+          },
+        ],
+        "kind": "object",
+        "title": "Image content",
+      },
+      "label": "Image content",
+    },
+  ],
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > filesystem-edit-file.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "kind": "string",
+      },
+      "name": "path",
+      "required": true,
+    },
+    {
+      "field": {
+        "item": {
+          "allowsAdditional": true,
+          "fields": [
+            {
+              "field": {
+                "description": "Text to search for - must match exactly",
+                "kind": "string",
+              },
+              "name": "oldText",
+              "required": true,
+            },
+            {
+              "field": {
+                "description": "Text to replace with",
+                "kind": "string",
+              },
+              "name": "newText",
+              "required": true,
+            },
+          ],
+          "kind": "object",
+        },
+        "kind": "array",
+      },
+      "name": "edits",
+      "required": true,
+    },
+    {
+      "field": {
+        "default": false,
+        "description": "Preview changes using git-style diff format",
+        "kind": "boolean",
+      },
+      "name": "dryRun",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > niagaramcp-read-bql.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "Base ORD to run the query against",
+        "kind": "string",
+      },
+      "name": "ord",
+      "required": true,
+    },
+    {
+      "field": {
+        "description": "BQL query, e.g. select displayName, out.value from control:NumericPoint",
+        "kind": "string",
+      },
+      "name": "bql",
+      "required": true,
+    },
+    {
+      "field": {
+        "default": 100,
+        "description": "Maximum rows to return",
+        "integer": true,
+        "kind": "number",
+        "maximum": 10000,
+        "minimum": 1,
+      },
+      "name": "limit",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+  "title": "readBql",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > nullable.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "An optional note",
+        "kind": "string",
+      },
+      "name": "note",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > server-everything-add-numbers.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "First number",
+        "integer": false,
+        "kind": "number",
+      },
+      "name": "a",
+      "required": true,
+    },
+    {
+      "field": {
+        "description": "Second number",
+        "integer": false,
+        "kind": "number",
+      },
+      "name": "b",
+      "required": true,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > server-everything-annotated-message.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "Type of message to demonstrate different annotation patterns",
+        "kind": "enum",
+        "options": [
+          {
+            "label": "error",
+            "value": "error",
+          },
+          {
+            "label": "success",
+            "value": "success",
+          },
+          {
+            "label": "debug",
+            "value": "debug",
+          },
+        ],
+      },
+      "name": "messageType",
+      "required": true,
+    },
+    {
+      "field": {
+        "default": false,
+        "description": "Whether to include an example image",
+        "kind": "boolean",
+      },
+      "name": "includeImage",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > server-everything-echo.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "description": "Message to echo",
+        "kind": "string",
+      },
+      "name": "message",
+      "required": true,
+    },
+  ],
+  "kind": "object",
+}
+`;
+
+exports[`compileSchema — fixture corpus (snapshots) > server-everything-long-running.json 1`] = `
+{
+  "allowsAdditional": true,
+  "fields": [
+    {
+      "field": {
+        "default": 10,
+        "description": "Duration of the operation in seconds",
+        "integer": false,
+        "kind": "number",
+      },
+      "name": "duration",
+      "required": false,
+    },
+    {
+      "field": {
+        "default": 5,
+        "description": "Number of steps in the operation",
+        "integer": false,
+        "kind": "number",
+      },
+      "name": "steps",
+      "required": false,
+    },
+  ],
+  "kind": "object",
+}
+`;

@@ -1,0 +1,7 @@
+{
+  "type": "object",
+  "properties": {
+    "duration": { "type": "number", "default": 10, "description": "Duration of the operation in seconds" },
+    "steps": { "type": "number", "default": 5, "description": "Number of steps in the operation" }
+  }
+}

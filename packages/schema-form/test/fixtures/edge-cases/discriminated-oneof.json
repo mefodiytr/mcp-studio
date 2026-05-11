@@ -1,0 +1,22 @@
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "title": "Text content",
+      "properties": {
+        "kind": { "const": "text" },
+        "text": { "type": "string" }
+      },
+      "required": ["kind", "text"]
+    },
+    {
+      "type": "object",
+      "title": "Image content",
+      "properties": {
+        "kind": { "const": "image" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "required": ["kind", "url"]
+    }
+  ]
+}

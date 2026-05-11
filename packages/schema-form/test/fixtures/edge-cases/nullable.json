@@ -1,0 +1,6 @@
+{
+  "type": "object",
+  "properties": {
+    "note": { "type": ["string", "null"], "description": "An optional note" }
+  }
+}

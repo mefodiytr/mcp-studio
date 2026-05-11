@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "path": { "type": "string" },
+    "edits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "oldText": { "type": "string", "description": "Text to search for - must match exactly" },
+          "newText": { "type": "string", "description": "Text to replace with" }
+        },
+        "required": ["oldText", "newText"]
+      }
+    },
+    "dryRun": { "type": "boolean", "default": false, "description": "Preview changes using git-style diff format" }
+  },
+  "required": ["path", "edits"]
+}
