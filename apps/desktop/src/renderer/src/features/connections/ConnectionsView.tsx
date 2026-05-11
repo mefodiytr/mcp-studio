@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, RotateCw, Server, Unplug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 import { Button } from '@renderer/components/ui/button';
 import {
@@ -10,6 +11,7 @@ import {
   reconnectConnection,
   useConnections,
 } from '@renderer/lib/connections';
+import { describeError } from '@renderer/lib/errors';
 import { getCredentialHint, useCreateProfile, useDeleteProfile, useProfiles } from '@renderer/lib/profiles';
 import { cn } from '@renderer/lib/utils';
 import type { ConnectionSummary, ToolSummary } from '@shared/domain/connection';
@@ -31,6 +33,27 @@ function transportSummary(profile: Profile): string {
     : `stdio · ${[profile.command, ...profile.args].join(' ')}`;
 }
 
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const width = 64;
+  const height = 14;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width;
+      const y = height - ((v - min) / range) * height;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(' ');
+  return (
+    <svg width={width} height={height} className="text-muted-foreground" aria-hidden>
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth={1} />
+    </svg>
+  );
+}
+
 export function ConnectionsView() {
   const { t } = useTranslation();
   const profilesQuery = useProfiles();
@@ -41,6 +64,19 @@ export function ConnectionsView() {
 
   const profiles = profilesQuery.data ?? [];
   const versions = window.studio?.versions;
+
+  // Toast when a previously-connected session drops.
+  const prevStatus = useRef<Map<string, ConnectionSummary['status']>>(new Map());
+  useEffect(() => {
+    for (const c of connections) {
+      if (c.status === 'error' && prevStatus.current.get(c.connectionId) === 'connected') {
+        toast.error(t('connections.dropped', { name: c.serverInfo?.name ?? c.profileId }), {
+          description: c.error ?? undefined,
+        });
+      }
+    }
+    prevStatus.current = new Map(connections.map((c) => [c.connectionId, c.status]));
+  }, [connections, t]);
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-auto p-6">
@@ -107,7 +143,8 @@ export function ConnectionsView() {
 
       <p className="mt-auto text-xs text-muted-foreground">
         {t('connections.proofOfLife')}
-        {versions?.['electron'] && ` · Electron ${versions['electron']} · Chromium ${versions['chrome']} · Node ${versions['node']}`}
+        {versions?.['electron'] &&
+          ` · Electron ${versions['electron']} · Chromium ${versions['chrome']} · Node ${versions['node']}`}
       </p>
     </div>
   );
@@ -141,7 +178,9 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
     try {
       await connectProfile(profile.id);
     } catch (cause) {
-      setConnectError(cause instanceof Error ? cause.message : String(cause));
+      const message = describeError(cause);
+      setConnectError(message);
+      toast.error(t('connections.connectFailed', { name: profile.name }), { description: message });
     } finally {
       setConnecting(false);
     }
@@ -228,13 +267,21 @@ function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
             {connection.serverInfo?.name ?? t('connections.unknownServer')}{' '}
             <span className="text-muted-foreground">{connection.serverInfo?.version}</span>
           </p>
-          <p className="text-xs text-muted-foreground">
-            {connection.transportKind}
-            {connection.latencyMs != null && ` · ${Math.round(connection.latencyMs)} ms`}
-            {' · '}
-            {connection.capabilities.tools} {t('connections.tools')} · {connection.capabilities.resources}{' '}
-            {t('connections.resources')} · {connection.capabilities.prompts} {t('connections.prompts')}
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {connection.transportKind}
+              {connection.latencyMs != null && ` · ${Math.round(connection.latencyMs)} ms`}
+              {' · '}
+              {connection.capabilities.tools} {t('connections.tools')} · {connection.capabilities.resources}{' '}
+              {t('connections.resources')} · {connection.capabilities.prompts} {t('connections.prompts')}
+            </span>
+            <Sparkline values={connection.latencyHistory} />
           </p>
+          {connection.sessionId && (
+            <p className="text-xs text-muted-foreground">
+              {t('connections.sessionId')}: <span className="font-mono">{connection.sessionId}</span>
+            </p>
+          )}
           {errored && connection.error && <p className="mt-1 text-xs text-destructive">{connection.error}</p>}
         </div>
         <div className="flex shrink-0 gap-1">

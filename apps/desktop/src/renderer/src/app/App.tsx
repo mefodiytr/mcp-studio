@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { Toaster } from '@renderer/components/ui/sonner';
 import { ThemeProvider } from '@renderer/lib/theme';
 
 import { AppShell } from './AppShell';
@@ -15,6 +16,7 @@ export function App() {
       <ThemeProvider>
         <AppShell />
         <CommandPalette />
+        <Toaster />
       </ThemeProvider>
     </QueryClientProvider>
   );

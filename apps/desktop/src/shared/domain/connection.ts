@@ -8,8 +8,12 @@ export const connectionSummarySchema = z.object({
   status: z.enum(['connected', 'error']),
   serverInfo: z.object({ name: z.string(), version: z.string(), title: z.string().optional() }).nullable(),
   capabilities: z.object({ tools: z.number(), resources: z.number(), prompts: z.number() }),
-  /** Round-trip latency of an MCP ping at connect time, in ms (null if unknown). */
+  /** Latest MCP-ping round-trip, in ms (null if unknown). */
   latencyMs: z.number().nullable(),
+  /** Recent ping samples (most recent last; capped) for a sparkline. */
+  latencyHistory: z.array(z.number()),
+  /** Streamable-HTTP session id (`Mcp-Session-Id`); null for stdio/sse. */
+  sessionId: z.string().nullable(),
   /** Set when status is "error" — the reason the session dropped. */
   error: z.string().nullable(),
 });

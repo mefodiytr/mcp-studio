@@ -9,6 +9,9 @@ import type { ProfileRepository } from '../store/profile-repository';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
 import type { ProtocolTap } from './protocol-tap';
 
+const LATENCY_HISTORY_CAP = 20;
+const LATENCY_POLL_MS = 15_000;
+
 interface Managed {
   connectionId: string;
   profileId: string;
@@ -40,8 +43,9 @@ function headersFor(profile: Profile, vault: CredentialVault): Record<string, st
 /**
  * Holds the live MCP sessions (one entry per connect attempt). Multiple
  * simultaneous connections are allowed; a dropped session stays in the map with
- * status "error" until disconnected or reconnected. Latency is sampled once at
- * connect time (per-request timing arrives with the protocol tap in C9).
+ * status "error" until disconnected or reconnected. Latency is sampled at
+ * connect time and re-sampled periodically (per-request timing is the protocol
+ * tap, C9).
  */
 export class ConnectionManager {
   private readonly connections = new Map<string, Managed>();
@@ -52,7 +56,9 @@ export class ConnectionManager {
     private readonly pidTracker: StdioPidTracker,
     private readonly tap: ProtocolTap,
     private readonly onChanged: (summaries: ConnectionSummary[]) => void,
-  ) {}
+  ) {
+    setInterval(() => void this.pollLatency(), LATENCY_POLL_MS).unref();
+  }
 
   list(): ConnectionSummary[] {
     return [...this.connections.values()].map((m) => m.summary);
@@ -92,6 +98,8 @@ export class ConnectionManager {
           : null,
         capabilities: counts,
         latencyMs,
+        latencyHistory: latencyMs != null ? [latencyMs] : [],
+        sessionId: connection.sessionId ?? null,
         error: null,
       };
 
@@ -146,6 +154,25 @@ export class ConnectionManager {
       name: tool.name,
       description: tool.description,
     }));
+  }
+
+  private async pollLatency(): Promise<void> {
+    const alive = [...this.connections.values()].filter((m) => m.summary.status === 'connected');
+    if (alive.length === 0) return;
+    let changed = false;
+    await Promise.all(
+      alive.map(async (managed) => {
+        try {
+          const latencyMs = await managed.connection.ping();
+          const latencyHistory = [...managed.summary.latencyHistory, latencyMs].slice(-LATENCY_HISTORY_CAP);
+          managed.summary = { ...managed.summary, latencyMs, latencyHistory };
+          changed = true;
+        } catch (cause) {
+          this.markErrored(managed.connectionId, cause instanceof Error ? cause.message : 'Ping failed');
+        }
+      }),
+    );
+    if (changed) this.emitChanged();
   }
 
   private markErrored(connectionId: string, message: string): void {

@@ -106,6 +106,11 @@ export class Connection {
     return this.transport instanceof StdioClientTransport ? this.transport.pid ?? undefined : undefined;
   }
 
+  /** Streamable-HTTP session id (`Mcp-Session-Id`), if any. */
+  get sessionId(): string | undefined {
+    return this.transport instanceof StreamableHTTPClientTransport ? this.transport.sessionId : undefined;
+  }
+
   /** Round-trip latency of an MCP `ping`, in milliseconds. */
   async ping(): Promise<number> {
     const startedAt = performance.now();
