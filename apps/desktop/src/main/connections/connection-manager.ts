@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Connection, type TransportConfig } from '@mcp-studio/mcp-client';
 
-import type { ConnectionSummary, ToolSummary } from '../../shared/domain/connection';
+import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
@@ -145,14 +145,17 @@ export class ConnectionManager {
     for (const pid of this.pidTracker.pids()) forceKillTree(pid);
   }
 
-  async listTools(connectionId: string): Promise<ToolSummary[]> {
+  async listTools(connectionId: string): Promise<ToolDescriptor[]> {
     const managed = this.connections.get(connectionId);
     if (!managed || managed.summary.status !== 'connected') {
       throw new Error(`Connection ${connectionId} is not available`);
     }
     return (await managed.connection.listTools()).map((tool) => ({
       name: tool.name,
+      title: tool.title,
       description: tool.description,
+      inputSchema: tool.inputSchema,
+      annotations: tool.annotations,
     }));
   }
 

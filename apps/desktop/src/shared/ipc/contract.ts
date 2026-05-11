@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { connectionSummarySchema, toolSummarySchema } from '../domain/connection';
+import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { protocolEventSchema } from '../domain/protocol';
 
@@ -80,7 +80,7 @@ export const invokeChannels = {
   },
   'connections:tools': {
     request: z.object({ connectionId: z.string() }),
-    response: z.object({ tools: z.array(toolSummarySchema) }),
+    response: z.object({ tools: z.array(toolDescriptorSchema) }),
   },
 
   // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────

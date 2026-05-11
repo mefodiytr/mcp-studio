@@ -3,13 +3,15 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
 
-export function TabBar() {
+import type { AppView } from './LeftRail';
+
+export function TabBar({ view }: { view: AppView }) {
   const { t } = useTranslation();
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-2">
       <div className="flex h-7 items-center gap-2 rounded-md bg-accent px-3 text-sm text-accent-foreground">
         <span className="size-1.5 rounded-full bg-muted-foreground" aria-hidden />
-        {t('tabs.connections')}
+        {t(`tabs.${view}`)}
       </div>
       <Button
         variant="ghost"

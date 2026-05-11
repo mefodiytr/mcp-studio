@@ -19,7 +19,30 @@
   },
   "tabs": {
     "connections": "Connections",
+    "tools": "Tools",
     "newView": "New view"
+  },
+  "tools": {
+    "title": "Tools",
+    "search": "Search tools…",
+    "loading": "Loading tools…",
+    "loadError": "Couldn't load tools.",
+    "empty": "No tools match the filters.",
+    "noConnection": "Connect a server to browse its tools.",
+    "schema": "Schema",
+    "call": "Call",
+    "callSoon": "Invocation arrives in C15",
+    "badge": {
+      "readOnly": "read-only",
+      "destructive": "destructive",
+      "idempotent": "idempotent",
+      "openWorld": "open-world"
+    },
+    "filter": {
+      "readOnlyHint": "read-only",
+      "destructiveHint": "destructive",
+      "idempotentHint": "idempotent"
+    }
   },
   "connections": {
     "savedServers": "Saved servers",

@@ -1,23 +1,26 @@
-import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
+import { useState } from 'react';
 
-import { LeftRail } from './LeftRail';
+import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
+import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
+
+import { LeftRail, type AppView } from './LeftRail';
 import { TabBar } from './TabBar';
 import { StatusBar } from './StatusBar';
 
 /**
  * The three-zone application chrome: a left navigation rail, and a main column
- * made of a tab strip, the active view, and a status bar. For now the only
- * view is Connections (the proof-of-life dev harness); the tab strip becomes
- * real in C22, the wizard/rail navigation in C10/C11.
+ * made of a tab strip, the active view, and a status bar. View switching is a
+ * single piece of state for now; the real multi-tab strip arrives in C22.
  */
 export function AppShell() {
+  const [view, setView] = useState<AppView>('connections');
   return (
     <div className="flex h-full w-full bg-background text-foreground">
-      <LeftRail />
+      <LeftRail view={view} onSelect={setView} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TabBar />
+        <TabBar view={view} />
         <main className="min-h-0 flex-1 overflow-auto">
-          <ConnectionsView />
+          {view === 'tools' ? <ToolsCatalog /> : <ConnectionsView />}
         </main>
         <StatusBar />
       </div>

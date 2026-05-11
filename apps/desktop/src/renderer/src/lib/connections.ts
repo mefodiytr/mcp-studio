@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { ConnectionSummary, ToolSummary } from '@shared/domain/connection';
+import type { ConnectionSummary } from '@shared/domain/connection';
 
 /** The live connections, kept in sync via the `connections:changed` event.
  *  Connections do not survive a process restart, so this starts empty. */
@@ -22,9 +22,4 @@ export async function reconnectConnection(connectionId: string): Promise<Connect
 
 export async function disconnectConnection(connectionId: string): Promise<void> {
   await window.studio?.invoke('connections:disconnect', { connectionId });
-}
-
-export async function fetchTools(connectionId: string): Promise<ToolSummary[]> {
-  if (!window.studio) return [];
-  return (await window.studio.invoke('connections:tools', { connectionId })).tools;
 }

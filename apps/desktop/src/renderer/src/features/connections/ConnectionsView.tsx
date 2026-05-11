@@ -4,17 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@renderer/components/ui/button';
-import {
-  connectProfile,
-  disconnectConnection,
-  fetchTools,
-  reconnectConnection,
-  useConnections,
-} from '@renderer/lib/connections';
+import { connectProfile, disconnectConnection, reconnectConnection, useConnections } from '@renderer/lib/connections';
 import { describeError } from '@renderer/lib/errors';
 import { getCredentialHint, useCreateProfile, useDeleteProfile, useProfiles } from '@renderer/lib/profiles';
+import { fetchTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
-import type { ConnectionSummary, ToolSummary } from '@shared/domain/connection';
+import type { ConnectionSummary, ToolDescriptor } from '@shared/domain/connection';
 import type { Profile, ProfileInput } from '@shared/domain/profile';
 
 import { ProfileWizard } from './ProfileWizard';
@@ -238,7 +233,7 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
 
 function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
   const { t } = useTranslation();
-  const [tools, setTools] = useState<ToolSummary[]>([]);
+  const [tools, setTools] = useState<ToolDescriptor[]>([]);
   const errored = connection.status === 'error';
 
   useEffect(() => {

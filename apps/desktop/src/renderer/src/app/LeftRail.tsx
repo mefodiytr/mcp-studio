@@ -5,21 +5,19 @@ import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-const NAV_ITEMS = [
-  { key: 'servers', Icon: Server, enabled: true },
-  { key: 'tools', Icon: Wrench, enabled: false },
-  { key: 'resources', Icon: Files, enabled: false },
-  { key: 'prompts', Icon: MessageSquare, enabled: false },
-  { key: 'inspector', Icon: Activity, enabled: false },
-] as const;
+export type AppView = 'connections' | 'tools';
 
-const THEME_ICON: Record<Theme, typeof Sun> = {
-  light: Sun,
-  dark: Moon,
-  system: Monitor,
-};
+const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
+  { key: 'servers', Icon: Server, view: 'connections' },
+  { key: 'tools', Icon: Wrench, view: 'tools' },
+  { key: 'resources', Icon: Files },
+  { key: 'prompts', Icon: MessageSquare },
+  { key: 'inspector', Icon: Activity },
+];
 
-export function LeftRail() {
+const THEME_ICON: Record<Theme, typeof Sun> = { light: Sun, dark: Moon, system: Monitor };
+
+export function LeftRail({ view, onSelect }: { view: AppView; onSelect: (view: AppView) => void }) {
   const { t } = useTranslation();
   const { theme, cycleTheme } = useTheme();
   const ThemeIcon = THEME_ICON[theme];
@@ -30,20 +28,24 @@ export function LeftRail() {
         M
       </div>
 
-      {NAV_ITEMS.map(({ key, Icon, enabled }) => (
-        <Button
-          key={key}
-          variant="ghost"
-          size="icon"
-          disabled={!enabled}
-          title={t(`nav.${key}`)}
-          aria-label={t(`nav.${key}`)}
-          aria-current={enabled ? 'page' : undefined}
-          className={cn(enabled && 'bg-sidebar-accent text-sidebar-accent-foreground')}
-        >
-          <Icon />
-        </Button>
-      ))}
+      {NAV_ITEMS.map(({ key, Icon, view: itemView }) => {
+        const active = itemView !== undefined && itemView === view;
+        return (
+          <Button
+            key={key}
+            variant="ghost"
+            size="icon"
+            disabled={itemView === undefined}
+            title={t(`nav.${key}`)}
+            aria-label={t(`nav.${key}`)}
+            aria-current={active ? 'page' : undefined}
+            onClick={itemView !== undefined ? () => onSelect(itemView) : undefined}
+            className={cn(active && 'bg-sidebar-accent text-sidebar-accent-foreground')}
+          >
+            <Icon />
+          </Button>
+        );
+      })}
 
       <div className="mt-auto flex flex-col items-center gap-1">
         <Button

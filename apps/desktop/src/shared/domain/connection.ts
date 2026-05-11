@@ -19,6 +19,25 @@ export const connectionSummarySchema = z.object({
 });
 export type ConnectionSummary = z.infer<typeof connectionSummarySchema>;
 
-/** A trimmed tool descriptor for the dev harness (the full schema lands in C14). */
-export const toolSummarySchema = z.object({ name: z.string(), description: z.string().optional() });
-export type ToolSummary = z.infer<typeof toolSummarySchema>;
+/** Tool annotation hints (`tools/list` → `Tool.annotations`). */
+export const toolAnnotationsSchema = z
+  .object({
+    title: z.string().optional(),
+    readOnlyHint: z.boolean().optional(),
+    destructiveHint: z.boolean().optional(),
+    idempotentHint: z.boolean().optional(),
+    openWorldHint: z.boolean().optional(),
+  })
+  .passthrough();
+export type ToolAnnotations = z.infer<typeof toolAnnotationsSchema>;
+
+/** A tool as advertised by `tools/list`, trimmed for the catalog UI. */
+export const toolDescriptorSchema = z.object({
+  name: z.string(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  /** The raw JSON Schema for the tool's arguments. */
+  inputSchema: z.unknown(),
+  annotations: toolAnnotationsSchema.optional(),
+});
+export type ToolDescriptor = z.infer<typeof toolDescriptorSchema>;
