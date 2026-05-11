@@ -6,6 +6,7 @@
   "nav": {
     "servers": "Servers",
     "tools": "Tools",
+    "history": "History",
     "resources": "Resources",
     "prompts": "Prompts",
     "inspector": "Protocol inspector",
@@ -20,6 +21,7 @@
   "tabs": {
     "connections": "Connections",
     "tools": "Tools",
+    "history": "History",
     "newView": "New view"
   },
   "tools": {
@@ -31,6 +33,7 @@
     "noConnection": "Connect a server to browse its tools.",
     "schema": "Schema",
     "call": "Call",
+    "lastCalled": "last called",
     "result": "Result",
     "showRaw": "View raw JSON-RPC",
     "hideRaw": "Hide raw JSON-RPC",
@@ -99,6 +102,25 @@
     "cancel": "Cancel",
     "create": "Create",
     "save": "Save"
+  },
+  "history": {
+    "title": "Tool-call history",
+    "search": "Search by tool or server…",
+    "allStatuses": "All",
+    "clear": "Clear history",
+    "empty": "No tool calls yet.",
+    "noMatch": "No history entries match the filters.",
+    "rerun": "Re-run",
+    "rerunning": "Re-running {{tool}}…",
+    "editRerun": "Edit & re-run",
+    "copy": "Copy",
+    "copied": "Copied as JSON-RPC.",
+    "connectionGone": "The original connection is no longer active.",
+    "status": {
+      "ok": "ok",
+      "tool-error": "tool error",
+      "error": "error"
+    }
   },
   "status": {
     "notConnected": "Not connected",

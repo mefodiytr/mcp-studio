@@ -7,6 +7,7 @@ import type { Profile } from '../../shared/domain/profile';
 import type { ToolCallOutcome } from '../../shared/domain/tool-result';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
+import type { ToolHistoryRepository } from '../store/tool-history-repository';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
 import type { ProtocolTap } from './protocol-tap';
 
@@ -56,7 +57,9 @@ export class ConnectionManager {
     private readonly vault: CredentialVault,
     private readonly pidTracker: StdioPidTracker,
     private readonly tap: ProtocolTap,
+    private readonly history: ToolHistoryRepository,
     private readonly onChanged: (summaries: ConnectionSummary[]) => void,
+    private readonly onHistoryChanged: () => void,
   ) {
     setInterval(() => void this.pollLatency(), LATENCY_POLL_MS).unref();
   }
@@ -147,7 +150,7 @@ export class ConnectionManager {
   }
 
   async listTools(connectionId: string): Promise<ToolDescriptor[]> {
-    return (await this.requireConnected(connectionId).listTools()).map((tool) => ({
+    return (await this.requireConnected(connectionId).connection.listTools()).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -161,23 +164,46 @@ export class ConnectionManager {
     toolName: string,
     args?: Record<string, unknown>,
   ): Promise<ToolCallOutcome> {
-    const connection = this.requireConnected(connectionId);
+    const managed = this.requireConnected(connectionId);
+    const startedAt = performance.now();
+    let outcome: ToolCallOutcome;
     try {
-      return { result: await connection.callTool(toolName, args), error: null };
+      outcome = { result: await managed.connection.callTool(toolName, args), error: null };
     } catch (cause) {
-      if (cause instanceof McpError) {
-        return { result: null, error: { code: cause.code, message: cause.message, data: cause.data } };
-      }
-      return { result: null, error: { message: cause instanceof Error ? cause.message : String(cause) } };
+      const error =
+        cause instanceof McpError
+          ? { code: cause.code, message: cause.message, data: cause.data }
+          : { message: cause instanceof Error ? cause.message : String(cause) };
+      outcome = { result: null, error };
     }
+    const durationMs = Math.round(performance.now() - startedAt);
+    const status: 'ok' | 'tool-error' | 'error' = outcome.error
+      ? 'error'
+      : outcome.result?.isError
+        ? 'tool-error'
+        : 'ok';
+    this.history.add({
+      connectionId,
+      profileId: managed.profileId,
+      serverName: managed.summary.serverInfo?.name ?? null,
+      toolName,
+      args: args ?? {},
+      status,
+      result: outcome.result,
+      error: outcome.error,
+      ts: new Date().toISOString(),
+      durationMs,
+    });
+    this.onHistoryChanged();
+    return outcome;
   }
 
-  private requireConnected(connectionId: string): Connection {
+  private requireConnected(connectionId: string): Managed {
     const managed = this.connections.get(connectionId);
     if (!managed || managed.summary.status !== 'connected') {
       throw new Error(`Connection ${connectionId} is not available`);
     }
-    return managed.connection;
+    return managed;
   }
 
   private async pollLatency(): Promise<void> {

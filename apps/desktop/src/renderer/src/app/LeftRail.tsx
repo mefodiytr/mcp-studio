@@ -1,15 +1,27 @@
-import { Activity, Files, MessageSquare, Monitor, Moon, Server, Settings, Sun, Wrench } from 'lucide-react';
+import {
+  Activity,
+  Files,
+  History,
+  MessageSquare,
+  Monitor,
+  Moon,
+  Server,
+  Settings,
+  Sun,
+  Wrench,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-export type AppView = 'connections' | 'tools';
+export type AppView = 'connections' | 'tools' | 'history';
 
 const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'servers', Icon: Server, view: 'connections' },
   { key: 'tools', Icon: Wrench, view: 'tools' },
+  { key: 'history', Icon: History, view: 'history' },
   { key: 'resources', Icon: Files },
   { key: 'prompts', Icon: MessageSquare },
   { key: 'inspector', Icon: Activity },

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
+import { HistoryPanel } from '@renderer/features/history/HistoryPanel';
 import { ToolsCatalog } from '@renderer/features/tools/ToolsCatalog';
 
 import { LeftRail, type AppView } from './LeftRail';
@@ -20,7 +21,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TabBar view={view} />
         <main className="min-h-0 flex-1 overflow-auto">
-          {view === 'tools' ? <ToolsCatalog /> : <ConnectionsView />}
+          {view === 'tools' ? <ToolsCatalog /> : view === 'history' ? <HistoryPanel /> : <ConnectionsView />}
         </main>
         <StatusBar />
       </div>

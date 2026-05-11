@@ -26,11 +26,14 @@ export function ToolInvocationDialog({
   tool,
   open,
   onOpenChange,
+  initialArgs,
 }: {
   connectionId: string;
   tool: ToolDescriptor;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pre-fill the args form (e.g. "edit & re-run" from history). */
+  initialArgs?: Record<string, unknown>;
 }) {
   const { t } = useTranslation();
   const [calling, setCalling] = useState(false);
@@ -96,6 +99,7 @@ export function ToolInvocationDialog({
         ) : (
           <SchemaForm
             schema={tool.inputSchema}
+            initialValue={initialArgs}
             onSubmit={onSubmit}
             submitLabel={calling ? '…' : t('tools.call')}
             busy={calling}

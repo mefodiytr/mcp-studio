@@ -52,18 +52,29 @@ export interface SchemaFormProps {
   submitLabel?: string;
   /** Disable the form (e.g. while a call is in flight). */
   busy?: boolean;
+  /** Pre-fill the form with this value instead of the schema-derived defaults
+   *  (e.g. "edit & re-run" from history). */
+  initialValue?: unknown;
 }
 
-export function SchemaForm({ schema, compiled, onSubmit, submitLabel = 'Submit', busy = false }: SchemaFormProps) {
+export function SchemaForm({
+  schema,
+  compiled,
+  onSubmit,
+  submitLabel = 'Submit',
+  busy = false,
+  initialValue,
+}: SchemaFormProps) {
   const form = useMemo<CompiledForm>(
     () => compiled ?? compileSchema((schema ?? {}) as JsonSchema),
     [compiled, schema],
   );
   const rootIsObject = form.field.kind === 'object';
+  const seed = initialValue !== undefined ? initialValue : form.defaultValue;
 
   const validator: z.ZodTypeAny = rootIsObject ? form.validator : z.object({ value: form.validator });
   const methods = useForm<FieldValues>({
-    defaultValues: (rootIsObject ? form.defaultValue : { value: form.defaultValue }) as FieldValues,
+    defaultValues: (rootIsObject ? seed : { value: seed }) as FieldValues,
     resolver: zodResolver(validator) as unknown as Resolver<FieldValues>,
   });
 

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { useConnections } from '@renderer/lib/connections';
+import { useHistory } from '@renderer/lib/history';
 import { useTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
 import type { ToolDescriptor } from '@shared/domain/connection';
@@ -32,6 +33,16 @@ export function ToolsCatalog() {
       else next.add(f);
       return next;
     });
+
+  const historyQuery = useHistory();
+  const lastCalled = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of historyQuery.data ?? []) {
+      if (activeId && entry.connectionId !== activeId) continue;
+      if (!map.has(entry.toolName)) map.set(entry.toolName, entry.ts);
+    }
+    return map;
+  }, [historyQuery.data, activeId]);
 
   const tools = toolsQuery.data ?? [];
   const visible = useMemo(() => {
@@ -104,7 +115,12 @@ export function ToolsCatalog() {
 
       <ul className="flex flex-col gap-3">
         {visible.map((tool) => (
-          <ToolRow key={tool.name} tool={tool} onCall={() => setInvoking(tool)} />
+          <ToolRow
+            key={tool.name}
+            tool={tool}
+            lastCalledAt={lastCalled.get(tool.name)}
+            onCall={() => setInvoking(tool)}
+          />
         ))}
         {!toolsQuery.isLoading && visible.length === 0 && (
           <li className="text-sm text-muted-foreground">{t('tools.empty')}</li>
@@ -125,7 +141,15 @@ export function ToolsCatalog() {
   );
 }
 
-function ToolRow({ tool, onCall }: { tool: ToolDescriptor; onCall: () => void }) {
+function ToolRow({
+  tool,
+  lastCalledAt,
+  onCall,
+}: {
+  tool: ToolDescriptor;
+  lastCalledAt?: string;
+  onCall: () => void;
+}) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const badges: { label: string; destructive?: boolean }[] = [];
@@ -155,6 +179,11 @@ function ToolRow({ tool, onCall }: { tool: ToolDescriptor; onCall: () => void })
                 </span>
               ))}
             </div>
+          )}
+          {lastCalledAt && (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              {t('tools.lastCalled')} {new Date(lastCalledAt).toLocaleTimeString()}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 gap-1">

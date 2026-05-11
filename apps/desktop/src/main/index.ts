@@ -8,12 +8,14 @@ import { ProtocolTap } from './connections/protocol-tap';
 import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ipc';
 import { registerConnectionHandlers } from './ipc/connections';
 import { registerCredentialHandlers } from './ipc/credentials';
+import { registerHistoryHandlers } from './ipc/history';
 import { registerProfileHandlers } from './ipc/profiles';
 import { registerProtocolHandlers } from './ipc/protocol';
 import { createConfigStore, type AppConfig } from './store/config-store';
 import { CredentialVault, createCredentialVaultStore, type SecretCipher } from './store/credential-vault';
 import type { JsonStore } from './store/json-store';
 import { ProfileRepository } from './store/profile-repository';
+import { ToolHistoryRepository } from './store/tool-history-repository';
 import { createWorkspaceStore } from './store/workspace-store';
 
 // Set before any path lookups so userData lives under "MCP Studio", not the
@@ -109,7 +111,9 @@ if (!gotSingleInstanceLock) {
 
     const userData = app.getPath('userData');
     configStore = createConfigStore(userData);
-    const profiles = new ProfileRepository(createWorkspaceStore(userData));
+    const workspaceStore = createWorkspaceStore(userData);
+    const profiles = new ProfileRepository(workspaceStore);
+    const toolHistory = new ToolHistoryRepository(workspaceStore);
 
     const cipher: SecretCipher = {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -130,8 +134,14 @@ if (!gotSingleInstanceLock) {
       );
     }
     const protocolTap = new ProtocolTap((event) => emitToRenderers('protocol:event', event));
-    connectionManager = new ConnectionManager(profiles, vault, pidTracker, protocolTap, (connections) =>
-      emitToRenderers('connections:changed', { connections }),
+    connectionManager = new ConnectionManager(
+      profiles,
+      vault,
+      pidTracker,
+      protocolTap,
+      toolHistory,
+      (connections) => emitToRenderers('connections:changed', { connections }),
+      () => emitToRenderers('history:changed', {}),
     );
 
     registerIpcHandlers();
@@ -139,6 +149,7 @@ if (!gotSingleInstanceLock) {
     registerCredentialHandlers(profiles, vault);
     registerConnectionHandlers(connectionManager);
     registerProtocolHandlers(protocolTap);
+    registerHistoryHandlers(toolHistory);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

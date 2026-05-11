@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { protocolEventSchema } from '../domain/protocol';
+import { toolHistoryEntrySchema } from '../domain/tool-history';
 import { toolCallOutcomeSchema } from '../domain/tool-result';
 
 /**
@@ -101,6 +102,20 @@ export const invokeChannels = {
     request: z.object({}),
     response: z.object({}),
   },
+
+  // ── Tool-call history ────────────────────────────────────────────────────
+  'history:list': {
+    request: z.object({}),
+    response: z.object({ entries: z.array(toolHistoryEntrySchema) }),
+  },
+  'history:get': {
+    request: z.object({ id: z.string() }),
+    response: z.object({ entry: toolHistoryEntrySchema.nullable() }),
+  },
+  'history:clear': {
+    request: z.object({}),
+    response: z.object({}),
+  },
 } as const;
 
 export const eventChannels = {
@@ -112,6 +127,8 @@ export const eventChannels = {
   'connections:changed': z.object({ connections: z.array(connectionSummarySchema) }),
   /** One JSON-RPC message observed on a connection's transport. */
   'protocol:event': protocolEventSchema,
+  /** Emitted after a tool invocation is recorded in the history. */
+  'history:changed': z.object({}),
 } as const;
 
 export type InvokeChannel = keyof typeof invokeChannels;
