@@ -9,7 +9,7 @@ export function TabBar() {
     <div className="flex h-9 shrink-0 items-center gap-1 border-b bg-background px-2">
       <div className="flex h-7 items-center gap-2 rounded-md bg-accent px-3 text-sm text-accent-foreground">
         <span className="size-1.5 rounded-full bg-muted-foreground" aria-hidden />
-        {t('tabs.welcome')}
+        {t('tabs.connections')}
       </div>
       <Button
         variant="ghost"

@@ -1,13 +1,14 @@
+import { ConnectionsView } from '@renderer/features/connections/ConnectionsView';
+
 import { LeftRail } from './LeftRail';
 import { TabBar } from './TabBar';
 import { StatusBar } from './StatusBar';
-import { WelcomeView } from './WelcomeView';
 
 /**
  * The three-zone application chrome: a left navigation rail, and a main column
- * made of a tab strip, the active view, and a status bar. Views (catalog, tool
- * detail, resources, inspector, …) get hung off the tab strip in later commits;
- * for now the only view is the Welcome / empty state.
+ * made of a tab strip, the active view, and a status bar. For now the only
+ * view is Connections (the proof-of-life dev harness); the tab strip becomes
+ * real in C22, the wizard/rail navigation in C10/C11.
  */
 export function AppShell() {
   return (
@@ -16,7 +17,7 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TabBar />
         <main className="min-h-0 flex-1 overflow-auto">
-          <WelcomeView />
+          <ConnectionsView />
         </main>
         <StatusBar />
       </div>

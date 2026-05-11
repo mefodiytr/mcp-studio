@@ -18,16 +18,19 @@
     "system": "System"
   },
   "tabs": {
-    "welcome": "Welcome",
+    "connections": "Connections",
     "newView": "New view"
   },
-  "welcome": {
-    "title": "Welcome to MCP Studio",
-    "noConnection": "No server connected.",
-    "connectCta": "Connect a server",
-    "connectSoon": "Connection wizard arrives in C10",
-    "milestone": "Milestone 1 — Foundation",
-    "shellReady": "Electron · Vite · React · TypeScript shell, design system, command palette mount point."
+  "connections": {
+    "title": "Connections",
+    "connectDev": "Connect server-everything (dev · stdio)",
+    "empty": "No MCP server connected.",
+    "proofOfLife": "Milestone 1 — Foundation · proof of life",
+    "disconnect": "Disconnect",
+    "unknownServer": "Unknown server",
+    "tools": "tools",
+    "resources": "resources",
+    "prompts": "prompts"
   },
   "status": {
     "notConnected": "Not connected",

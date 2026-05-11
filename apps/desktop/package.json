@@ -15,6 +15,7 @@
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web"
   },
   "dependencies": {
+    "@mcp-studio/mcp-client": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "i18next": "^24.2.1",
@@ -26,6 +27,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@modelcontextprotocol/server-everything": "^2026.1.26",
     "@radix-ui/react-slot": "^1.1.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/react": "^18.3.18",

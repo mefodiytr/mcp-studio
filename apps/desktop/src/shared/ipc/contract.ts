@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { connectionSummarySchema, toolSummarySchema } from '../domain/connection';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 
 /**
@@ -58,12 +59,33 @@ export const invokeChannels = {
     request: z.object({ profileId: z.string() }),
     response: z.object({ profileId: z.string() }),
   },
+
+  // ── Live connections (the main process owns the MCP sessions) ─────────────
+  'connections:list': {
+    request: z.object({}),
+    response: z.array(connectionSummarySchema),
+  },
+  'connections:connect': {
+    request: z.object({ profileId: z.string() }),
+    response: connectionSummarySchema,
+  },
+  'connections:disconnect': {
+    request: z.object({ connectionId: z.string() }),
+    response: z.object({ connectionId: z.string() }),
+  },
+  'connections:tools': {
+    request: z.object({ connectionId: z.string() }),
+    response: z.object({ tools: z.array(toolSummarySchema) }),
+  },
 } as const;
 
 export const eventChannels = {
   /** Demo heartbeat — proves the event mechanism; superseded by real sources
    *  (connection status in C11, the protocol tap in C9). */
   'app:tick': z.object({ seq: z.number().int().nonnegative(), at: z.number() }),
+  /** Emitted whenever the set of live connections changes (connect / disconnect
+   *  / drop). Carries the full current list so the renderer can replace state. */
+  'connections:changed': z.object({ connections: z.array(connectionSummarySchema) }),
 } as const;
 
 export type InvokeChannel = keyof typeof invokeChannels;

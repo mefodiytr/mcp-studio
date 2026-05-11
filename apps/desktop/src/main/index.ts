@@ -2,7 +2,9 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, safeStorage, shell } from 'electron';
 
-import { registerIpcHandlers, startDemoEventSource } from './ipc';
+import { ConnectionManager } from './connections/connection-manager';
+import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ipc';
+import { registerConnectionHandlers } from './ipc/connections';
 import { registerCredentialHandlers } from './ipc/credentials';
 import { registerProfileHandlers } from './ipc/profiles';
 import { createConfigStore, type AppConfig } from './store/config-store';
@@ -75,7 +77,7 @@ function createMainWindow(): BrowserWindow {
           writeFileSync(CAPTURE_PATH, image.toPNG());
           app.quit();
         });
-      }, 2500);
+      }, 5000);
     });
   }
 
@@ -97,6 +99,7 @@ if (!gotSingleInstanceLock) {
   app.on('second-instance', focusExistingWindow);
 
   let stopDemoEvents: (() => void) | undefined;
+  let connectionManager: ConnectionManager | undefined;
 
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.mcpstudio.app');
@@ -115,9 +118,14 @@ if (!gotSingleInstanceLock) {
     }
     const vault = new CredentialVault(createCredentialVaultStore(userData), cipher);
 
+    connectionManager = new ConnectionManager(profiles, vault, (connections) =>
+      emitToRenderers('connections:changed', { connections }),
+    );
+
     registerIpcHandlers();
     registerProfileHandlers(profiles, vault);
     registerCredentialHandlers(profiles, vault);
+    registerConnectionHandlers(connectionManager);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();
@@ -127,7 +135,12 @@ if (!gotSingleInstanceLock) {
     });
   });
 
-  app.on('will-quit', () => stopDemoEvents?.());
+  app.on('will-quit', () => {
+    stopDemoEvents?.();
+    // Fire-and-forget: close live sessions (kills stdio child processes).
+    // TODO(C8/C9): harden child-process lifecycle (job objects on Windows).
+    void connectionManager?.disconnectAll();
+  });
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
