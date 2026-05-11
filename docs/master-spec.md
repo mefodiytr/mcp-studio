@@ -531,6 +531,16 @@ Monorepo via pnpm workspaces. Single `pnpm dev` to launch Electron with hot relo
 
 Полный список отклонений от §11 (Δ1–Δ8) с обоснованиями — в `docs/milestone-1.md`.
 
+### Adjustments during the M1 build
+
+Уточнения, всплывшие по ходу реализации (после kickoff). Здесь — чтобы спека отражала фактический state без раскопок в commit-сообщениях.
+
+- **§4 persistence — самописный `JsonStore` вместо `electron-store`.** ~100-строчный dependency-free JSON-file store в main (`config.json` / `workspace.json` / `credentials.json` в userData; load-on-construct, atomic `*.tmp`→rename на save, `schemaVersion` + `migrate()` hook). Причина: `electron-store` v9+ — ESM-only, что трётся с CJS-бандлом main-процесса; самописный store проще мигрировать на better-sqlite3 в M4, чем переходить через abstraction electron-store. Миграция на better-sqlite3 в M4 не меняется (явный `// TODO(M4)` в `json-store.ts`). [C5]
+- **Тема (`light | dark | system`) хранится в renderer `localStorage`**, не в main config — вопреки буквальному «config хранит theme» из §4/M1-плана. Тема применяется к `<html>` синхронно до первого paint (`main.tsx`), что требует синхронного чтения; localStorage это даёт, async-IPC до первого paint — нет (был бы FOUC). Main config держит остальное (window bounds, feature flags). [C3/C5]
+- **ESM `@modelcontextprotocol/sdk` бандлится в CJS main-bundle** (`externalizeDepsPlugin({ exclude: ['@mcp-studio/mcp-client'] })` в electron-vite main-конфиге; main-bundle ~480 кБ). Причина: Electron 33.2.1 несёт Node 20.18.1, который не умеет `require()` ESM. Renderer всегда ESM (Vite). Обратимо — при оптимизации сборки в M8 можно вернуться к ESM-main, если будет выгода. [C7b]
+- **Electron запинен на `33.2.1` (exact)** вместо последнего 33.x — версия из локального `@electron/get`-кэша; свежий 33.x стопорился на ~115 МБ-загрузке бинаря. Бамп — отдельным коммитом, когда удобно (33-ветка ещё получает security-fixes). [C2]
+- **C7 разъехался на C7 + C7b** в плане: C7 = пакет `mcp-client` (по плану); C7b = минимальный `ConnectionManager` + `connections:*` IPC + `ConnectionsView` dev-харнесс — заимствует куски C8 (connection manager) и C11 (connection inspector) на 2 коммита раньше ради сквозного «proof of life». C8/C11 «по-настоящему» дополняют минимальные версии, не переписывают. [C7b]
+
 ---
 
 ## Next step
