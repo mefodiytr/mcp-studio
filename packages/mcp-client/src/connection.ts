@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import type {
   CallToolResult,
   GetPromptResult,
@@ -162,6 +163,12 @@ export class Connection {
 
   async getPrompt(name: string, args?: Record<string, string>): Promise<GetPromptResult> {
     return this.client.getPrompt({ name, arguments: args });
+  }
+
+  /** Send an arbitrary JSON-RPC request and return the raw result (the
+   *  protocol-inspector escape hatch). Throws an McpError on a JSON-RPC error. */
+  async rawRequest(method: string, params?: Record<string, unknown>): Promise<unknown> {
+    return this.client.request({ method, params }, z.any());
   }
 
   set onClose(callback: (() => void) | undefined) {

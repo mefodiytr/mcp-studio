@@ -7,6 +7,7 @@
     "servers": "Servers",
     "tools": "Tools",
     "history": "History",
+    "raw": "Raw JSON-RPC",
     "resources": "Resources",
     "prompts": "Prompts",
     "inspector": "Protocol inspector",
@@ -22,6 +23,7 @@
     "connections": "Connections",
     "tools": "Tools",
     "history": "History",
+    "raw": "Raw JSON-RPC",
     "newView": "New view"
   },
   "tools": {
@@ -44,6 +46,8 @@
     "destructiveWarning": "This tool is marked destructive. Run it with these arguments?",
     "runAnyway": "Run anyway",
     "cancel": "Cancel",
+    "promptOk": "OK",
+    "useLastArgs": "Use last args",
     "badge": {
       "readOnly": "read-only",
       "destructive": "destructive",
@@ -121,6 +125,17 @@
       "tool-error": "tool error",
       "error": "error"
     }
+  },
+  "raw": {
+    "title": "Raw JSON-RPC",
+    "noConnection": "Connect a server to send raw requests.",
+    "method": "Method",
+    "params": "Params (JSON object)",
+    "send": "Send",
+    "invalidJson": "Params must be valid JSON.",
+    "paramsMustBeObject": "Params must be a JSON object.",
+    "responseOk": "Response",
+    "responseError": "Error"
   },
   "status": {
     "notConnected": "Not connected",

@@ -30,3 +30,12 @@ export const toolCallOutcomeSchema = z.object({
   error: toolCallErrorSchema.nullable(),
 });
 export type ToolCallOutcome = z.infer<typeof toolCallOutcomeSchema>;
+
+/** The outcome of a raw JSON-RPC pass-through request. `ok` disambiguates a
+ *  legitimately-`null` result from a failure. */
+export const rawRequestOutcomeSchema = z.object({
+  ok: z.boolean(),
+  result: z.unknown(),
+  error: toolCallErrorSchema.nullable(),
+});
+export type RawRequestOutcome = z.infer<typeof rawRequestOutcomeSchema>;

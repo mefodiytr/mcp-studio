@@ -4,7 +4,7 @@ import { Connection, McpError, type TransportConfig } from '@mcp-studio/mcp-clie
 
 import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
-import type { ToolCallOutcome } from '../../shared/domain/tool-result';
+import type { RawRequestOutcome, ToolCallOutcome } from '../../shared/domain/tool-result';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import type { ToolHistoryRepository } from '../store/tool-history-repository';
@@ -196,6 +196,23 @@ export class ConnectionManager {
     });
     this.onHistoryChanged();
     return outcome;
+  }
+
+  async rawRequest(
+    connectionId: string,
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<RawRequestOutcome> {
+    const connection = this.requireConnected(connectionId).connection;
+    try {
+      return { ok: true, result: await connection.rawRequest(method, params), error: null };
+    } catch (cause) {
+      const error =
+        cause instanceof McpError
+          ? { code: cause.code, message: cause.message, data: cause.data }
+          : { message: cause instanceof Error ? cause.message : String(cause) };
+      return { ok: false, result: null, error };
+    }
   }
 
   private requireConnected(connectionId: string): Managed {

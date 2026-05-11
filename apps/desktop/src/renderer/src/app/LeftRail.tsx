@@ -1,5 +1,6 @@
 import {
   Activity,
+  Braces,
   Files,
   History,
   MessageSquare,
@@ -16,12 +17,13 @@ import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-export type AppView = 'connections' | 'tools' | 'history';
+export type AppView = 'connections' | 'tools' | 'history' | 'raw';
 
 const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'servers', Icon: Server, view: 'connections' },
   { key: 'tools', Icon: Wrench, view: 'tools' },
   { key: 'history', Icon: History, view: 'history' },
+  { key: 'raw', Icon: Braces, view: 'raw' },
   { key: 'resources', Icon: Files },
   { key: 'prompts', Icon: MessageSquare },
   { key: 'inspector', Icon: Activity },

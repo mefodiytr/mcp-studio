@@ -4,7 +4,7 @@ import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connect
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { protocolEventSchema } from '../domain/protocol';
 import { toolHistoryEntrySchema } from '../domain/tool-history';
-import { toolCallOutcomeSchema } from '../domain/tool-result';
+import { rawRequestOutcomeSchema, toolCallOutcomeSchema } from '../domain/tool-result';
 
 /**
  * The single source of truth for the renderer ↔ main IPC surface.
@@ -91,6 +91,14 @@ export const invokeChannels = {
       args: z.record(z.unknown()).optional(),
     }),
     response: toolCallOutcomeSchema,
+  },
+  'connections:raw': {
+    request: z.object({
+      connectionId: z.string(),
+      method: z.string(),
+      params: z.record(z.unknown()).optional(),
+    }),
+    response: rawRequestOutcomeSchema,
   },
 
   // ── Protocol inspector (raw JSON-RPC traffic) ────────────────────────────
