@@ -97,6 +97,40 @@
     "hideRaw": "Hide raw JSON-RPC",
     "emptyResult": "(no messages)"
   },
+  "inspector": {
+    "title": "Protocol inspector",
+    "pause": "Pause",
+    "resume": "Resume",
+    "paused": "paused",
+    "clear": "Clear",
+    "export": "Export filtered as JSON",
+    "close": "Close",
+    "methodFilter": "method…",
+    "allConnections": "All connections",
+    "minDur": "min ms",
+    "empty": "No traffic captured yet.",
+    "noMatch": "No messages match the filters.",
+    "errorLabel": "error",
+    "notification": "Notification",
+    "request": "Request",
+    "response": "Response",
+    "notCaptured": "(not captured)",
+    "status": {
+      "all": "All",
+      "requests": "Requests",
+      "responses": "Responses",
+      "notifications": "Notifications",
+      "errors": "Errors"
+    },
+    "col": {
+      "ts": "Time",
+      "conn": "Connection",
+      "dir": "Dir",
+      "method": "Method",
+      "status": "Kind",
+      "dur": "Duration"
+    }
+  },
   "connections": {
     "savedServers": "Saved servers",
     "addServer": "Add server",

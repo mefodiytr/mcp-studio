@@ -26,12 +26,21 @@ const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'prompts', Icon: MessageSquare, view: 'prompts' },
   { key: 'history', Icon: History, view: 'history' },
   { key: 'raw', Icon: Braces, view: 'raw' },
-  { key: 'inspector', Icon: Activity },
 ];
 
 const THEME_ICON: Record<Theme, typeof Sun> = { light: Sun, dark: Moon, system: Monitor };
 
-export function LeftRail({ view, onSelect }: { view: AppView; onSelect: (view: AppView) => void }) {
+export function LeftRail({
+  view,
+  onSelect,
+  inspectorOpen,
+  onToggleInspector,
+}: {
+  view: AppView;
+  onSelect: (view: AppView) => void;
+  inspectorOpen: boolean;
+  onToggleInspector: () => void;
+}) {
   const { t } = useTranslation();
   const { theme, cycleTheme } = useTheme();
   const ThemeIcon = THEME_ICON[theme];
@@ -43,13 +52,12 @@ export function LeftRail({ view, onSelect }: { view: AppView; onSelect: (view: A
       </div>
 
       {NAV_ITEMS.map(({ key, Icon, view: itemView }) => {
-        const active = itemView !== undefined && itemView === view;
+        const active = itemView === view;
         return (
           <Button
             key={key}
             variant="ghost"
             size="icon"
-            disabled={itemView === undefined}
             title={t(`nav.${key}`)}
             aria-label={t(`nav.${key}`)}
             aria-current={active ? 'page' : undefined}
@@ -60,6 +68,18 @@ export function LeftRail({ view, onSelect }: { view: AppView; onSelect: (view: A
           </Button>
         );
       })}
+
+      <Button
+        variant="ghost"
+        size="icon"
+        title={`${t('nav.inspector')}  (Ctrl+\`)`}
+        aria-label={t('nav.inspector')}
+        aria-pressed={inspectorOpen}
+        onClick={onToggleInspector}
+        className={cn(inspectorOpen && 'bg-sidebar-accent text-sidebar-accent-foreground')}
+      >
+        <Activity />
+      </Button>
 
       <div className="mt-auto flex flex-col items-center gap-1">
         <Button
