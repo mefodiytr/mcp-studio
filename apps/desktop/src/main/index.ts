@@ -3,6 +3,15 @@ import { join } from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 
 import { registerIpcHandlers, startDemoEventSource } from './ipc';
+import { registerProfileHandlers } from './ipc/profiles';
+import { createConfigStore, type AppConfig } from './store/config-store';
+import type { JsonStore } from './store/json-store';
+import { ProfileRepository } from './store/profile-repository';
+import { createWorkspaceStore } from './store/workspace-store';
+
+// Set before any path lookups so userData lives under "MCP Studio", not the
+// scoped package name.
+app.setName('MCP Studio');
 
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL'];
 // Automation hook: when set, capture the rendered window to this PNG path once
@@ -10,10 +19,16 @@ const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL'];
 // no effect during normal use.
 const CAPTURE_PATH = process.env['MCPSTUDIO_CAPTURE_PATH'];
 
+const DEFAULT_WIDTH = 1280;
+const DEFAULT_HEIGHT = 800;
+
+let configStore: JsonStore<AppConfig> | undefined;
+
 function createMainWindow(): BrowserWindow {
+  const bounds = configStore?.data.windowBounds;
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: bounds?.width ?? DEFAULT_WIDTH,
+    height: bounds?.height ?? DEFAULT_HEIGHT,
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -28,6 +43,14 @@ function createMainWindow(): BrowserWindow {
   });
 
   window.on('ready-to-show', () => window.show());
+
+  // Persist the window size so it is restored next launch.
+  window.on('close', () => {
+    if (!configStore || window.isMinimized()) return;
+    const { width, height } = window.getBounds();
+    configStore.data.windowBounds = { width, height };
+    configStore.save();
+  });
 
   // Open external links in the OS browser; never navigate the app window away.
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -76,7 +99,12 @@ if (!gotSingleInstanceLock) {
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.mcpstudio.app');
 
+    const userData = app.getPath('userData');
+    configStore = createConfigStore(userData);
+    const profiles = new ProfileRepository(createWorkspaceStore(userData));
+
     registerIpcHandlers();
+    registerProfileHandlers(profiles);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

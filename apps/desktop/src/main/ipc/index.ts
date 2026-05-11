@@ -9,14 +9,14 @@ import {
   type InvokeChannel,
   type InvokeRequest,
   type InvokeResponse,
-} from '@shared/ipc/contract';
+} from '../../shared/ipc/contract';
 
 type InvokeHandler<C extends InvokeChannel> = (
   request: InvokeRequest<C>,
 ) => InvokeResponse<C> | Promise<InvokeResponse<C>>;
 
 /** Register a typed `ipcMain.handle` whose request and response are zod-checked. */
-function handle<C extends InvokeChannel>(channel: C, handler: InvokeHandler<C>): void {
+export function handle<C extends InvokeChannel>(channel: C, handler: InvokeHandler<C>): void {
   ipcMain.handle(channel, async (_event, raw: unknown) => {
     const request = parseInvokeRequest(channel, raw);
     const response = await handler(request);

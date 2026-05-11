@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { profileInputSchema, profileSchema } from '../domain/profile';
+
 /**
  * The single source of truth for the renderer ↔ main IPC surface.
  *
@@ -19,6 +21,28 @@ export const invokeChannels = {
   'app:ping': {
     request: z.object({ at: z.number() }),
     response: z.object({ pong: z.literal(true), at: z.number(), echoedAt: z.number() }),
+  },
+
+  // ── Connection profiles (workspace store; secrets live in the vault) ───────
+  'profiles:list': {
+    request: z.object({}),
+    response: z.array(profileSchema),
+  },
+  'profiles:get': {
+    request: z.object({ id: z.string() }),
+    response: profileSchema,
+  },
+  'profiles:create': {
+    request: z.object({ input: profileInputSchema }),
+    response: profileSchema,
+  },
+  'profiles:update': {
+    request: z.object({ id: z.string(), input: profileInputSchema }),
+    response: profileSchema,
+  },
+  'profiles:delete': {
+    request: z.object({ id: z.string() }),
+    response: z.object({ id: z.string() }),
   },
 } as const;
 

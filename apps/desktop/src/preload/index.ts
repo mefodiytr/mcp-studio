@@ -6,8 +6,8 @@ import type {
   InvokeChannel,
   InvokeRequest,
   InvokeResponse,
-} from '@shared/ipc/contract';
-import type { StudioBridge } from '@shared/ipc/bridge';
+} from '../shared/ipc/contract';
+import type { StudioBridge } from '../shared/ipc/bridge';
 
 // Thin, typed pass-through to the main process. Validation lives on the main
 // side (see shared/ipc/contract.ts) so this script — which also runs in the
