@@ -506,6 +506,10 @@ Monorepo via pnpm workspaces. Single `pnpm dev` to launch Electron with hot relo
 - AI co-pilot способен по фразе на русском воспроизвести смысловую операцию через tools без переспросов в 80%+ случаев.
 - 100k-компонентная станция отзывчива (interaction < 100ms на actions, tree expand < 500ms).
 
+### Cross-cutting policy — coverage as a ratchet
+
+Каждый package с `vitest`-coverage имеет **floor-пороги в `vitest.config.ts`, которые только растут**. Когда покрытие чего-либо реально низкое (например, `mcp-client` в M1 — happy path покрыт интеграционным тестом + e2e, но HTTP/SSE-транспорты и error/disconnect-пути ещё нет), порог ставится чуть ниже фактического числа — это regression-фильтр, не aspiration. По мере добавления тестов floor поднимается тем же коммитом. Никогда не «напишем тесты потом» без зафиксированного нижнего порога; никогда не понижать floor (только хотфикс с явным обоснованием в commit-сообщении). `schema-form` — ≥90 (lines/funcs/stmts) с M1; `mcp-client` — floor 55/40/55/50 (lines/funcs/stmts/branches) с M1, поднять при добавлении транспорт- и error-path-тестов.
+
 ---
 
 ## 14. Открытые вопросы для следующей итерации
