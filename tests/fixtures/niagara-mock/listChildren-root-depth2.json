@@ -1,0 +1,371 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "listChildren",
+      "arguments": {
+        "ord": "station:|slot:/",
+        "depth": 2
+      }
+    }
+  },
+  "response": {
+    "result": {
+      "isError": false,
+      "structuredContent": {
+        "ord": "station:|slot:/",
+        "isPoint": false,
+        "children": [
+          {
+            "ord": "station:|slot:/Services",
+            "isPoint": false,
+            "children": [
+              {
+                "ord": "station:|slot:/Services/AlarmService",
+                "isPoint": false,
+                "displayName": "AlarmService",
+                "name": "AlarmService",
+                "type": "alarm:AlarmService"
+              },
+              {
+                "ord": "station:|slot:/Services/BackupService",
+                "isPoint": false,
+                "displayName": "BackupService",
+                "name": "BackupService",
+                "type": "backup:BackupService"
+              },
+              {
+                "ord": "station:|slot:/Services/CategoryService",
+                "isPoint": false,
+                "displayName": "CategoryService",
+                "name": "CategoryService",
+                "type": "baja:CategoryService"
+              },
+              {
+                "ord": "station:|slot:/Services/JobService",
+                "isPoint": false,
+                "displayName": "JobService",
+                "name": "JobService",
+                "type": "baja:JobService"
+              },
+              {
+                "ord": "station:|slot:/Services/SecurityService",
+                "isPoint": false,
+                "displayName": "SecurityService",
+                "name": "SecurityService",
+                "type": "nss:SecurityService"
+              },
+              {
+                "ord": "station:|slot:/Services/RoleService",
+                "isPoint": false,
+                "displayName": "RoleService",
+                "name": "RoleService",
+                "type": "baja:RoleService"
+              },
+              {
+                "ord": "station:|slot:/Services/UserService",
+                "isPoint": false,
+                "displayName": "UserService",
+                "name": "UserService",
+                "type": "baja:UserService"
+              },
+              {
+                "ord": "station:|slot:/Services/AuthenticationService",
+                "isPoint": false,
+                "displayName": "AuthenticationService",
+                "name": "AuthenticationService",
+                "type": "baja:AuthenticationService"
+              },
+              {
+                "ord": "station:|slot:/Services/LoggingService",
+                "isPoint": false,
+                "displayName": "DebugService",
+                "name": "LoggingService",
+                "type": "baja:LoggingService"
+              },
+              {
+                "ord": "station:|slot:/Services/BoxService",
+                "isPoint": false,
+                "displayName": "BoxService",
+                "name": "BoxService",
+                "type": "box:BoxService"
+              },
+              {
+                "ord": "station:|slot:/Services/FoxService",
+                "isPoint": false,
+                "displayName": "FoxService",
+                "name": "FoxService",
+                "type": "fox:FoxService"
+              },
+              {
+                "ord": "station:|slot:/Services/HierarchyService",
+                "isPoint": false,
+                "displayName": "HierarchyService",
+                "name": "HierarchyService",
+                "type": "hierarchy:HierarchyService"
+              },
+              {
+                "ord": "station:|slot:/Services/HistoryService",
+                "isPoint": false,
+                "displayName": "HistoryService",
+                "name": "HistoryService",
+                "type": "history:HistoryService"
+              },
+              {
+                "ord": "station:|slot:/Services/AuditHistoryService",
+                "isPoint": false,
+                "displayName": "AuditHistoryService",
+                "name": "AuditHistoryService",
+                "type": "history:AuditHistoryService"
+              },
+              {
+                "ord": "station:|slot:/Services/LogHistoryService",
+                "isPoint": false,
+                "displayName": "LogHistoryService",
+                "name": "LogHistoryService",
+                "type": "history:LogHistoryService"
+              },
+              {
+                "ord": "station:|slot:/Services/ProgramService",
+                "isPoint": false,
+                "displayName": "ProgramService",
+                "name": "ProgramService",
+                "type": "program:ProgramService"
+              },
+              {
+                "ord": "station:|slot:/Services/SearchService",
+                "isPoint": false,
+                "displayName": "SearchService",
+                "name": "SearchService",
+                "type": "search:SearchService"
+              },
+              {
+                "ord": "station:|slot:/Services/TagDictionaryService",
+                "isPoint": false,
+                "displayName": "TagDictionaryService",
+                "name": "TagDictionaryService",
+                "type": "tagdictionary:TagDictionaryService"
+              },
+              {
+                "ord": "station:|slot:/Services/TemplateService",
+                "isPoint": false,
+                "displayName": "TemplateService",
+                "name": "TemplateService",
+                "type": "template:TemplateService"
+              },
+              {
+                "ord": "station:|slot:/Services/WebService",
+                "isPoint": false,
+                "displayName": "WebService",
+                "name": "WebService",
+                "type": "web:WebService"
+              },
+              {
+                "ord": "station:|slot:/Services/McpPlatformService",
+                "isPoint": false,
+                "displayName": "McpPlatformService",
+                "name": "McpPlatformService",
+                "type": "niagaramcp:McpPlatformService"
+              },
+              {
+                "ord": "station:|slot:/Services/PlatformServices",
+                "isPoint": false,
+                "displayName": "PlatformServices",
+                "name": "PlatformServices",
+                "type": "platform:PlatformServiceContainer"
+              }
+            ],
+            "displayName": "Services",
+            "name": "Services",
+            "type": "baja:ServiceContainer"
+          },
+          {
+            "ord": "station:|slot:/Drivers",
+            "isPoint": false,
+            "children": [
+              {
+                "ord": "station:|slot:/Drivers/NiagaraNetwork",
+                "isPoint": false,
+                "displayName": "NiagaraNetwork",
+                "name": "NiagaraNetwork",
+                "type": "niagaraDriver:NiagaraNetwork"
+              },
+              {
+                "ord": "station:|slot:/Drivers/ObixNetwork",
+                "isPoint": false,
+                "displayName": "ObixNetwork",
+                "name": "ObixNetwork",
+                "type": "obixDriver:ObixNetwork"
+              },
+              {
+                "ord": "station:|slot:/Drivers/MCP_Test",
+                "isPoint": false,
+                "displayName": "MCP_Test",
+                "name": "MCP_Test",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778491589",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778491589",
+                "name": "mcpSmoke_1778491589",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke51_1778491589",
+                "isPoint": false,
+                "displayName": "mcpSmoke51_1778491589",
+                "name": "mcpSmoke51_1778491589",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778494311",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778494311",
+                "name": "mcpSmoke_1778494311",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke51_1778494311",
+                "isPoint": false,
+                "displayName": "mcpSmoke51_1778494311",
+                "name": "mcpSmoke51_1778494311",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778496402",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778496402",
+                "name": "mcpSmoke_1778496402",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778498777",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778498777",
+                "name": "mcpSmoke_1778498777",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778507454",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778507454",
+                "name": "mcpSmoke_1778507454",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778507734",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778507734",
+                "name": "mcpSmoke_1778507734",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778514466",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778514466",
+                "name": "mcpSmoke_1778514466",
+                "type": "baja:Folder"
+              },
+              {
+                "ord": "station:|slot:/Drivers/mcpSmoke_1778563349",
+                "isPoint": false,
+                "displayName": "mcpSmoke_1778563349",
+                "name": "mcpSmoke_1778563349",
+                "type": "baja:Folder"
+              }
+            ],
+            "displayName": "Drivers",
+            "name": "Drivers",
+            "type": "driver:DriverContainer"
+          },
+          {
+            "ord": "station:|slot:/test1",
+            "isPoint": false,
+            "children": [
+              {
+                "ord": "station:|slot:/test1/BooleanWritable",
+                "isPoint": true,
+                "displayName": "BooleanWritable",
+                "name": "BooleanWritable",
+                "type": "control:BooleanWritable"
+              },
+              {
+                "ord": "station:|slot:/test1/test",
+                "isPoint": false,
+                "displayName": "test",
+                "name": "test",
+                "type": "testbc:VentPidController"
+              },
+              {
+                "ord": "station:|slot:/test1/testext",
+                "isPoint": false,
+                "displayName": "testext",
+                "name": "testext",
+                "type": "testbcExt:VentPidController"
+              },
+              {
+                "ord": "station:|slot:/test1/Tstat",
+                "isPoint": true,
+                "displayName": "Tstat",
+                "name": "Tstat",
+                "type": "kitControl:Tstat"
+              },
+              {
+                "ord": "station:|slot:/test1/WithAction",
+                "isPoint": false,
+                "displayName": "WithAction",
+                "name": "WithAction",
+                "type": "program:Program"
+              }
+            ],
+            "displayName": "test1",
+            "name": "test1",
+            "type": "baja:Folder"
+          },
+          {
+            "ord": "station:|slot:/test",
+            "isPoint": false,
+            "children": [],
+            "displayName": "test",
+            "name": "test",
+            "type": "baja:Folder"
+          },
+          {
+            "ord": "station:|slot:/bql_test",
+            "isPoint": false,
+            "children": [
+              {
+                "ord": "station:|slot:/bql_test/BqlGrid",
+                "isPoint": false,
+                "displayName": "BqlGrid",
+                "name": "BqlGrid",
+                "type": "report:BqlGrid"
+              },
+              {
+                "ord": "station:|slot:/bql_test/AllPointsBqlGrid",
+                "isPoint": false,
+                "displayName": "AllPointsBqlGrid",
+                "name": "AllPointsBqlGrid",
+                "type": "report:BqlGrid"
+              }
+            ],
+            "displayName": "bql_test",
+            "name": "bql_test",
+            "type": "baja:Folder"
+          }
+        ],
+        "displayName": "Конфигурация",
+        "name": "",
+        "type": "baja:Station"
+      },
+      "content": [
+        {
+          "text": "{\"ord\":\"station:|slot:/\",\"isPoint\":false,\"children\":[{\"ord\":\"station:|slot:/Services\",\"isPoint\":false,\"children\":[{\"ord\":\"station:|slot:/Services/AlarmService\",\"isPoint\":false,\"displayName\":\"AlarmService\",\"name\":\"AlarmService\",\"type\":\"alarm:AlarmService\"},{\"ord\":\"station:|slot:/Services/BackupService\",\"isPoint\":false,\"displayName\":\"BackupService\",\"name\":\"BackupService\",\"type\":\"backup:BackupService\"},{\"ord\":\"station:|slot:/Services/CategoryService\",\"isPoint\":false,\"displayName\":\"CategoryService\",\"name\":\"CategoryService\",\"type\":\"baja:CategoryService\"},{\"ord\":\"station:|slot:/Services/JobService\",\"isPoint\":false,\"displayName\":\"JobService\",\"name\":\"JobService\",\"type\":\"baja:JobService\"},{\"ord\":\"station:|slot:/Services/SecurityService\",\"isPoint\":false,\"displayName\":\"SecurityService\",\"name\":\"SecurityService\",\"type\":\"nss:SecurityService\"},{\"ord\":\"station:|slot:/Services/RoleService\",\"isPoint\":false,\"displayName\":\"RoleService\",\"name\":\"RoleService\",\"type\":\"baja:RoleService\"},{\"ord\":\"station:|slot:/Services/UserService\",\"isPoint\":false,\"displayName\":\"UserService\",\"name\":\"UserService\",\"type\":\"baja:UserService\"},{\"ord\":\"station:|slot:/Services/AuthenticationService\",\"isPoint\":false,\"displayName\":\"AuthenticationService\",\"name\":\"AuthenticationService\",\"type\":\"baja:AuthenticationService\"},{\"ord\":\"station:|slot:/Services/LoggingService\",\"isPoint\":false,\"displayName\":\"DebugService\",\"name\":\"LoggingService\",\"type\":\"baja:LoggingService\"},{\"ord\":\"station:|slot:/Services/BoxService\",\"isPoint\":false,\"displayName\":\"BoxService\",\"name\":\"BoxService\",\"type\":\"box:BoxService\"},{\"ord\":\"station:|slot:/Services/FoxService\",\"isPoint\":false,\"displayName\":\"FoxService\",\"name\":\"FoxService\",\"type\":\"fox:FoxService\"},{\"ord\":\"station:|slot:/Services/HierarchyService\",\"isPoint\":false,\"displayName\":\"HierarchyService\",\"name\":\"HierarchyService\",\"type\":\"hierarchy:HierarchyService\"},{\"ord\":\"station:|slot:/Services/HistoryService\",\"isPoint\":false,\"displayName\":\"HistoryService\",\"name\":\"HistoryService\",\"type\":\"history:HistoryService\"},{\"ord\":\"station:|slot:/Services/AuditHistoryService\",\"isPoint\":false,\"displayName\":\"AuditHistoryService\",\"name\":\"AuditHistoryService\",\"type\":\"history:AuditHistoryService\"},{\"ord\":\"station:|slot:/Services/LogHistoryService\",\"isPoint\":false,\"displayName\":\"LogHistoryService\",\"name\":\"LogHistoryService\",\"type\":\"history:LogHistoryService\"},{\"ord\":\"station:|slot:/Services/ProgramService\",\"isPoint\":false,\"displayName\":\"ProgramService\",\"name\":\"ProgramService\",\"type\":\"program:ProgramService\"},{\"ord\":\"station:|slot:/Services/SearchService\",\"isPoint\":false,\"displayName\":\"SearchService\",\"name\":\"SearchService\",\"type\":\"search:SearchService\"},{\"ord\":\"station:|slot:/Services/TagDictionaryService\",\"isPoint\":false,\"displayName\":\"TagDictionaryService\",\"name\":\"TagDictionaryService\",\"type\":\"tagdictionary:TagDictionaryService\"},{\"ord\":\"station:|slot:/Services/TemplateService\",\"isPoint\":false,\"displayName\":\"TemplateService\",\"name\":\"TemplateService\",\"type\":\"template:TemplateService\"},{\"ord\":\"station:|slot:/Services/WebService\",\"isPoint\":false,\"displayName\":\"WebService\",\"name\":\"WebService\",\"type\":\"web:WebService\"},{\"ord\":\"station:|slot:/Services/McpPlatformService\",\"isPoint\":false,\"displayName\":\"McpPlatformService\",\"name\":\"McpPlatformService\",\"type\":\"niagaramcp:McpPlatformService\"},{\"ord\":\"station:|slot:/Services/PlatformServices\",\"isPoint\":false,\"displayName\":\"PlatformServices\",\"name\":\"PlatformServices\",\"type\":\"platform:PlatformServiceContainer\"}],\"displayName\":\"Services\",\"name\":\"Services\",\"type\":\"baja:ServiceContainer\"},{\"ord\":\"station:|slot:/Drivers\",\"isPoint\":false,\"children\":[{\"ord\":\"station:|slot:/Drivers/NiagaraNetwork\",\"isPoint\":false,\"displayName\":\"NiagaraNetwork\",\"name\":\"NiagaraNetwork\",\"type\":\"niagaraDriver:NiagaraNetwork\"},{\"ord\":\"station:|slot:/Drivers/ObixNetwork\",\"isPoint\":false,\"displayName\":\"ObixNetwork\",\"name\":\"ObixNetwork\",\"type\":\"obixDriver:ObixNetwork\"},{\"ord\":\"station:|slot:/Drivers/MCP_Test\",\"isPoint\":false,\"displayName\":\"MCP_Test\",\"name\":\"MCP_Test\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778491589\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778491589\",\"name\":\"mcpSmoke_1778491589\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke51_1778491589\",\"isPoint\":false,\"displayName\":\"mcpSmoke51_1778491589\",\"name\":\"mcpSmoke51_1778491589\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778494311\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778494311\",\"name\":\"mcpSmoke_1778494311\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke51_1778494311\",\"isPoint\":false,\"displayName\":\"mcpSmoke51_1778494311\",\"name\":\"mcpSmoke51_1778494311\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778496402\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778496402\",\"name\":\"mcpSmoke_1778496402\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778498777\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778498777\",\"name\":\"mcpSmoke_1778498777\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778507454\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778507454\",\"name\":\"mcpSmoke_1778507454\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778507734\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778507734\",\"name\":\"mcpSmoke_1778507734\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778514466\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778514466\",\"name\":\"mcpSmoke_1778514466\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/Drivers/mcpSmoke_1778563349\",\"isPoint\":false,\"displayName\":\"mcpSmoke_1778563349\",\"name\":\"mcpSmoke_1778563349\",\"type\":\"baja:Folder\"}],\"displayName\":\"Drivers\",\"name\":\"Drivers\",\"type\":\"driver:DriverContainer\"},{\"ord\":\"station:|slot:/test1\",\"isPoint\":false,\"children\":[{\"ord\":\"station:|slot:/test1/BooleanWritable\",\"isPoint\":true,\"displayName\":\"BooleanWritable\",\"name\":\"BooleanWritable\",\"type\":\"control:BooleanWritable\"},{\"ord\":\"station:|slot:/test1/test\",\"isPoint\":false,\"displayName\":\"test\",\"name\":\"test\",\"type\":\"testbc:VentPidController\"},{\"ord\":\"station:|slot:/test1/testext\",\"isPoint\":false,\"displayName\":\"testext\",\"name\":\"testext\",\"type\":\"testbcExt:VentPidController\"},{\"ord\":\"station:|slot:/test1/Tstat\",\"isPoint\":true,\"displayName\":\"Tstat\",\"name\":\"Tstat\",\"type\":\"kitControl:Tstat\"},{\"ord\":\"station:|slot:/test1/WithAction\",\"isPoint\":false,\"displayName\":\"WithAction\",\"name\":\"WithAction\",\"type\":\"program:Program\"}],\"displayName\":\"test1\",\"name\":\"test1\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/test\",\"isPoint\":false,\"children\":[],\"displayName\":\"test\",\"name\":\"test\",\"type\":\"baja:Folder\"},{\"ord\":\"station:|slot:/bql_test\",\"isPoint\":false,\"children\":[{\"ord\":\"station:|slot:/bql_test/BqlGrid\",\"isPoint\":false,\"displayName\":\"BqlGrid\",\"name\":\"BqlGrid\",\"type\":\"report:BqlGrid\"},{\"ord\":\"station:|slot:/bql_test/AllPointsBqlGrid\",\"isPoint\":false,\"displayName\":\"AllPointsBqlGrid\",\"name\":\"AllPointsBqlGrid\",\"type\":\"report:BqlGrid\"}],\"displayName\":\"bql_test\",\"name\":\"bql_test\",\"type\":\"baja:Folder\"}],\"displayName\":\"Конфигурация\",\"name\":\"\",\"type\":\"baja:Station\"}",
+          "type": "text"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,1378 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "method": "tools/list",
+    "params": {}
+  },
+  "response": {
+    "result": {
+      "tools": [
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "msg": {
+                "description": "Сообщение для возврата",
+                "type": "string"
+              }
+            },
+            "required": [
+              "msg"
+            ]
+          },
+          "name": "echo",
+          "description": "Вернуть переданное сообщение (для проверки соединения)",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "transport-test"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord узла, например 'station:|slot:/' или 'station:|slot:/Drivers'",
+                "type": "string"
+              },
+              "depth": {
+                "maximum": 5,
+                "description": "Глубина обхода (1..5, по умолчанию 1)",
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "listChildren",
+          "description": "Перечислить дочерние компоненты узла станции по его ord на заданную глубину. Возвращает JSON с полями name, ord, type, displayName, isPoint и (при depth>1) children. Используется для обзора структуры станции без BQL. depth=1 — прямые потомки, максимум 5.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord точки, например 'station:|slot:/Logic/Sensor1'",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "readPoint",
+          "description": "Прочитать текущее значение и метаданные точки станции по её ord. Возвращает JSON с полями ord, displayName, type, value, status, priority, out (исходная строка) и facets (если есть, например units).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord точки, например 'station:|slot:/Logic/Setpoint'",
+                "type": "string"
+              },
+              "priority": {
+                "maximum": 16,
+                "description": "Уровень приоритета 1..16 (по умолчанию 16)",
+                "type": "integer",
+                "minimum": 1
+              },
+              "value": {
+                "description": "Записываемое значение: число, булево, строка, целое (для enum), либо null для освобождения приоритета"
+              }
+            },
+            "required": [
+              "ord",
+              "value"
+            ]
+          },
+          "name": "writePoint",
+          "description": "Записать значение в writable-точку станции по её ord. Поддерживает Numeric/Boolean/String/Enum writable-точки. Приоритет 1..16 (по умолчанию 16). Передайте value=null чтобы освободить указанный приоритет.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "description": "Полный ord с BQL-частью",
+                "type": "string"
+              },
+              "limit": {
+                "maximum": 1000,
+                "description": "Максимум строк в ответе (по умолчанию 100)",
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "query"
+            ]
+          },
+          "name": "bqlQuery",
+          "description": "Выполнить BQL-запрос к станции и получить таблицу с результатами. На вход полный ord с BQL-частью, например 'station:|slot:/Drivers|bql:select displayName, out from control:ControlPoint'. Результат — TSV: первая строка — имена колонок, далее строки данных. Параметр limit ограничивает число строк (по умолчанию 100, максимум 1000).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "getOverview",
+          "description": "Top-level station structure summary: station name, immediate top-level slots (Drivers, Logic, Services, etc.), and counts of children with Niagara types.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Niagara ord of the component",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "inspectComponent",
+          "description": "Inspect a single component by ord. Returns JSON with: ord, name, displayName, type, parentOrd, childCount.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "typeName": {
+                "type": "string"
+              },
+              "limit": {
+                "maximum": 1000,
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "typeName"
+            ]
+          },
+          "name": "findComponentsByType",
+          "description": "Find all components matching a Niagara type. typeName accepts either short (e.g. 'BNumericPoint') or qualified (e.g. 'control:NumericPoint') form.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "getSlots",
+          "description": "List all properties (slots) of a component by ord. Returns each slot's name, type, current value (toString), and selected facets (units, precision).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-read"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "name": "createSpace",
+          "description": "Create a new space (zone/floor/parking/...) in the knowledge model. id must be unique and kebab-case.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "parent": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "name": "updateSpace",
+          "description": "Update fields of an existing space. Only fields present in args are modified; absent fields preserve existing values. id is required for lookup.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "typical_points": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "extends": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          },
+          "name": "createEquipmentType",
+          "description": "Create a new equipment_type (template for AHU/Chiller/Pump/...). extends references another type id (cycle-checked).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "typical_points": {
+                "type": "array"
+              },
+              "aliases": {
+                "type": "array"
+              },
+              "extends": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "name": "updateEquipmentType",
+          "description": "Update fields of an existing equipment_type. typical_points (if supplied) REPLACES the existing list. To append a single role, use the dedicated assignPointToEquipment tool on a specific equipment instead.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "space": {
+                "type": "string"
+              },
+              "points": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "type",
+              "ord"
+            ]
+          },
+          "name": "createEquipment",
+          "description": "Create a new equipment instance (one specific AHU/Chiller/etc.). type must reference an existing equipment_type. ord is the Niagara ord of the equipment's root component.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array"
+              },
+              "notes": {
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "space": {
+                "type": "string"
+              },
+              "points": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "name": "updateEquipment",
+          "description": "Update fields on an existing equipment entry. points (if supplied) merges into existing role->ord map; pass empty object {} to leave unchanged.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ]
+          },
+          "name": "bulkCreateEquipment",
+          "description": "Create multiple equipment entries atomically. Validates all entries before writing any; either all succeed or none are added.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "equipmentId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "equipmentId",
+              "role",
+              "ord"
+            ]
+          },
+          "name": "assignPointToEquipment",
+          "description": "Assign a Niagara ord to a semantic role on an existing equipment. Role is free-form (e.g. supply_air_temp); ord is validated for syntax only.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              },
+              "aliases": {
+                "type": "array"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "role_in_space": {
+                "type": "string"
+              },
+              "space": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "ord"
+            ]
+          },
+          "name": "createStandalonePoint",
+          "description": "Register a stand-alone point (e.g. ambient temperature/CO2 sensor) under a space.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "validateKnowledge",
+          "description": "Validate the current knowledge model against schema rules. Returns a list of warnings (orphan refs, duplicate ids, parent cycles). Read-only.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "walkthrough-write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "getKnowledgeSummary",
+          "description": "Counts of spaces / equipment_types / equipment / standalone points; current schema_version and storage format (yaml|json).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "management"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "typeName": {
+                "description": "e.g. BControlPoint",
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "typeName"
+            ]
+          },
+          "name": "findUnmappedComponents",
+          "description": "List Niagara components matching typeName that are NOT referenced by any knowledge equipment.ord, equipment.points, or standalonePoint.ord. Useful to find points still needing walkthrough coverage.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "management"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "type": "string",
+                "enum": [
+                  "yaml",
+                  "json"
+                ]
+              }
+            }
+          },
+          "name": "exportKnowledge",
+          "description": "Return the entire knowledge model as a string. format: 'yaml' (default) or 'json'.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "management"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "merge",
+                  "replace"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "sample"
+                ]
+              },
+              "content": {
+                "type": "string"
+              }
+            }
+          },
+          "name": "importKnowledge",
+          "description": "Import a knowledge document. content is the raw YAML/JSON text (autodetected); OR set source='sample' to load the jar-bundled sample-knowledge.yaml. mode='merge' adds new entries (skipping id collisions); mode='replace' wipes and replaces the entire model.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "management"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "reloadKnowledge",
+          "description": "Re-read the knowledge file from disk. Use after manually editing the file in an external editor. No-op if the in-memory model is already current.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "management"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "query"
+            ]
+          },
+          "name": "findEquipment",
+          "description": "Find equipment matching a query string. Searches name + aliases + id, case-insensitive substring. Returns ranked matches.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "search"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "spaceId": {
+                "type": "string"
+              },
+              "recursive": {
+                "type": "boolean"
+              },
+              "equipmentType": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "spaceId"
+            ]
+          },
+          "name": "findInSpace",
+          "description": "List equipment and stand-alone points within a space. If recursive=true, includes descendant spaces. equipmentType is an optional type filter.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "search"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          },
+          "name": "findPoints",
+          "description": "Search points by role (e.g. supply_air_temp), kind (temperature/boolean/...), or substring against equipment id/name/aliases. At least one of role/kind/text is required.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "search"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "from": {
+                "description": "ISO datetime or epoch ms",
+                "type": "string"
+              },
+              "aggregation": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "avg",
+                  "min",
+                  "max",
+                  "count"
+                ]
+              },
+              "to": {
+                "description": "ISO datetime or epoch ms; default now",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord",
+              "from"
+            ]
+          },
+          "name": "readHistory",
+          "description": "Read history records for a control point or BHistoryExt between from/to (ISO datetime or epoch ms). Optional aggregation: none|avg|min|max|count (client-side; Niagara has no server-side aggregation). limit caps row count (default 1000, max 10000); a 10s iteration timeout also applies.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "history"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "sourceOrdPrefix": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              }
+            }
+          },
+          "name": "getActiveAlarms",
+          "description": "List currently-open alarms (off-normal/fault, not yet returned to normal). Optional sourceOrdPrefix filters by source ord starting with that string.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "alarms"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "sourceOrdPrefix": {
+                "type": "string"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from"
+            ]
+          },
+          "name": "getAlarmHistory",
+          "description": "Historical alarm records via AlarmDbConnection.timeQuery(from, to). Optional sourceOrdPrefix filters to a slot subtree (e.g. equipment ord). Capped at 2000 rows / 10s iteration; truncation reported in footer.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "alarms"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "getServerInfo",
+          "description": "Server diagnostic snapshot — version, uptimeSeconds, sessionCount, knowledgeFile {path,size,equipmentCount,lastModifiedMs}, transports, registered tools/resources/prompts.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "probeOrd",
+          "description": "Probe a Niagara ord for existence and key attributes. Returns {exists, type, displayName, parentOrd, slotCount, isControlPoint, isWritable, hasHistoryExt, historyExtCount, historyExtIds, isAlarmSource}. Unresolvable ords yield {exists:false} (no error).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "checkKnowledgeIntegrity",
+          "description": "Check that every ord in the knowledge model resolves on the running station. Returns {totalRefs, validRefs, brokenRefs:[{equipment|point, role?, ord, reason}]}.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "getServiceHealth",
+          "description": "Health snapshot. Returns {alarmService, historyService, knowledgeFile{readable,writable,exists}, knowledgeAuditLog{writable}, sampleResource}.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "getDiagnosticDump",
+          "description": "One-shot diagnostic snapshot combining server identity, active sessions, knowledge store stats, service health, and the last 20 lines of the knowledge audit log.",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "format": {
+                "description": "Output format: text (default) or json.",
+                "type": "string",
+                "enum": [
+                  "text",
+                  "json"
+                ]
+              }
+            }
+          },
+          "name": "getFeatureDump",
+          "description": "Static feature inventory of the running server (version, tools by category, resources, prompts, transports, knowledge stats, session count, health, JSON-RPC error codes). Args: format=\"text\"|\"json\" (default text).",
+          "annotations": {
+            "idempotentHint": true,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": true
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "parentOrd": {
+                "description": "Ord of the parent BComponent (e.g. 'station:|slot:/Drivers').",
+                "type": "string"
+              },
+              "nameStrategy": {
+                "description": "Behaviour on name collision: \"fail\" (default) raises -32602; \"suffix\" appends _2, _3, ... until a free name is found.",
+                "type": "string",
+                "enum": [
+                  "fail",
+                  "suffix"
+                ]
+              },
+              "name": {
+                "description": "Slot name for the new child. Must be a valid Niagara slot name.",
+                "type": "string"
+              },
+              "type": {
+                "description": "Niagara type spec in 'module:TypeName' form (e.g. 'baja:Folder', 'control:NumericPoint').",
+                "type": "string"
+              }
+            },
+            "required": [
+              "parentOrd",
+              "type",
+              "name"
+            ]
+          },
+          "name": "createComponent",
+          "description": "Create a new BComponent as a child of an existing component, under the calling user's Niagara permissions. Args: parentOrd, type (\"module:TypeName\"), name, optional nameStrategy (\"fail\" default | \"suffix\"). Returns the new component's ord and the resolved name.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": false,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "username": {
+                "description": "Name of a pre-existing BUser (operator must create via Workbench first).",
+                "type": "string"
+              },
+              "token": {
+                "description": "Plaintext bearer token to bind. Hashed with the service tokenSalt before storage.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "username",
+              "token"
+            ]
+          },
+          "name": "setupTestUser",
+          "description": "TEST-ONLY (gated by BMcpPlatformService.enableTestSetup). Bind an mcp:tokenHash tag to a pre-created BUser so the smoke client can authenticate as that user. Args: {username, token}. Refuses unless enableTestSetup=true.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "diagnostic"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord of the BComponent to remove (e.g. 'station:|slot:/Drivers/BasementHVAC').",
+                "type": "string"
+              },
+              "dryRun": {
+                "description": "If true (default), report what would happen without mutating.",
+                "type": "boolean"
+              },
+              "force": {
+                "description": "If true, remove even when inbound links exist (default false).",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ord"
+            ]
+          },
+          "name": "removeComponent",
+          "description": "Remove a BComponent from its parent slot, under the calling user's permissions. Default dryRun=true; refuses if inbound links exist unless force=true. Does NOT detect outbound links where the target is the source — those become dangling refs (use linkSlots tooling to clean up first). DESTRUCTIVE: MCP-aware clients should warn the user before invoking with dryRun=false.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": true,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord of the BComponent owning the slot.",
+                "type": "string"
+              },
+              "slotName": {
+                "description": "Name of the slot to set (must already exist on the component).",
+                "type": "string"
+              },
+              "value": {
+                "description": "New value (string / number / integer / boolean). Coerced to the slot's existing BSimple type.",
+                "type": [
+                  "string",
+                  "number",
+                  "integer",
+                  "boolean"
+                ]
+              }
+            },
+            "required": [
+              "ord",
+              "slotName",
+              "value"
+            ]
+          },
+          "name": "setSlot",
+          "description": "Set a configuration slot on a BComponent under user-Context. Args: {ord, slotName, value}. Coerces value to the slot's existing BSimple type (BString/BBoolean/BInteger/BLong/BFloat/BDouble). Use clearSlot to reset to default; writePoint for status-value priority slots. Complex slot types are not supported.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord of the component owning the Action.",
+                "type": "string"
+              },
+              "args": {
+                "description": "Action argument (BSimple primitive). Omit / null → action's parameter default.",
+                "type": [
+                  "string",
+                  "number",
+                  "integer",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "actionName": {
+                "description": "Action name as declared in the BComponent.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord",
+              "actionName"
+            ]
+          },
+          "name": "invokeAction",
+          "description": "Invoke an Action on a BComponent under user-Context. Args: {ord, actionName, args?}. args is coerced to the action's BSimple parameter type (string/bool/int/long/float/double); complex parameter types not supported. Returns the action's return value, type, and execution duration.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "parentOrd": {
+                "description": "Ord of the BComponent to extend (e.g. a control point).",
+                "type": "string"
+              },
+              "nameStrategy": {
+                "description": "Behaviour on name collision: \"fail\" (default) → -32602; \"suffix\" → _2/_3/...",
+                "type": "string",
+                "enum": [
+                  "fail",
+                  "suffix"
+                ]
+              },
+              "extensionType": {
+                "description": "Type spec 'module:TypeName' (e.g. 'history:NumericIntervalExt').",
+                "type": "string"
+              },
+              "name": {
+                "description": "Slot name for the new extension.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "parentOrd",
+              "extensionType",
+              "name"
+            ]
+          },
+          "name": "addExtension",
+          "description": "Add an extension instance (history/alarm/proxy ext, ...) as a child of an existing component under user-Context. Args: {parentOrd, extensionType, name, nameStrategy?}. Pre-checks applicability (isChildLegal/isParentLegal); incompatible parent/extension pairs are refused with -32015.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "sourceOrd": {
+                "description": "Component supplying the value.",
+                "type": "string"
+              },
+              "sinkSlot": {
+                "description": "Slot name on the sink.",
+                "type": "string"
+              },
+              "sinkOrd": {
+                "description": "Component receiving the value (link is stored here).",
+                "type": "string"
+              },
+              "sourceSlot": {
+                "description": "Slot name on the source.",
+                "type": "string"
+              },
+              "converterType": {
+                "description": "Optional 'module:Type' of a BConverter; when set, a BConversionLink is used and the checkLink type-mismatch refusal is bypassed (e.g. 'baja:NullConverter').",
+                "type": "string"
+              },
+              "linkName": {
+                "description": "Optional name for the link slot; default = sourceComponent + sourceSlot suffix.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "sourceOrd",
+              "sourceSlot",
+              "sinkOrd",
+              "sinkSlot"
+            ]
+          },
+          "name": "linkSlots",
+          "description": "Wire a source slot to a sink slot via BLink (or BConversionLink when a converterType is given), stored on the sink under user-Context. Args: {sourceOrd, sourceSlot, sinkOrd, sinkSlot, linkName?, converterType?}. Calls Niagara's checkLink first; type mismatch without a converterType → -32016. converterType must be a 'module:Type' that resolves to a BConverter.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "sinkOrd": {
+                "description": "Ord of the sink BComponent that owns the link slot. Use with linkName.",
+                "type": "string"
+              },
+              "linkOrd": {
+                "description": "Ord of the BLink slot to remove. Mutually exclusive with sinkOrd/linkName.",
+                "type": "string"
+              },
+              "linkName": {
+                "description": "Name of the link slot on the sink component. Use with sinkOrd.",
+                "type": "string"
+              }
+            }
+          },
+          "name": "unlinkSlots",
+          "description": "Remove a BLink slot under user-Context. Args: {linkOrd} OR {sinkOrd, linkName}. Refuses if the resolved slot isn't a BLink (use removeComponent for non-link components). DESTRUCTIVE: the source/sink wire info is captured in the result for audit but Niagara has no built-in undo.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": true,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {}
+          },
+          "name": "commitStation",
+          "description": "Force a synchronous save of the station's .bog under the calling user's permissions. Use after a batch of mutations when ack-without-persistence (~30s auto-save delay) is unacceptable. Returns when the save completes.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        },
+        {
+          "requiresUserContext": true,
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "ord": {
+                "description": "Ord of the BComponent owning the slot.",
+                "type": "string"
+              },
+              "slotName": {
+                "description": "Name of the Property slot to reset (must exist on the component).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ord",
+              "slotName"
+            ]
+          },
+          "name": "clearSlot",
+          "description": "Reset a Property slot on a BComponent to its declared default value, under user-Context. Args: {ord, slotName}. Works for any Property slot type; use setSlot to write a specific value instead.",
+          "annotations": {
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "destructiveHint": false,
+            "readOnlyHint": false
+          },
+          "category": "write"
+        }
+      ]
+    }
+  }
+}

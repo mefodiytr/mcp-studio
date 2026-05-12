@@ -1,0 +1,24 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "bqlQuery",
+      "arguments": {
+        "query": "station:|slot:/Drivers|bql:select displayName, out from control:ControlPoint",
+        "limit": 5
+      }
+    }
+  },
+  "response": {
+    "result": {
+      "isError": false,
+      "content": [
+        {
+          "text": "Display Name\tOut\noat\t- {null} @ def\n\n[rows=1]",
+          "type": "text"
+        }
+      ]
+    }
+  }
+}
