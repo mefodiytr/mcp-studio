@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
+import { signOutOAuth } from '@renderer/lib/auth';
 import { connectProfile, disconnectConnection, useConnections } from '@renderer/lib/connections';
 import { describeError } from '@renderer/lib/errors';
 import { clearHistory, useHistory } from '@renderer/lib/history';
@@ -108,6 +109,19 @@ export function useAppCommands({ view, setView, inspectorOpen, setInspectorOpen 
           run: () => {
             void connectProfile(profile.id)
               .then(() => toast.success(t('connections.connected', { name: profile.name })))
+              .catch((cause: unknown) => toast.error(describeError(cause)));
+          },
+        });
+      }
+      if (profile.auth.method === 'oauth') {
+        list.push({
+          id: `conn.signOut.${profile.id}`,
+          title: t('commandPalette.signOutOf', { name: profile.name }),
+          group: groups.connections,
+          keywords: `${profile.name} oauth`,
+          run: () => {
+            void signOutOAuth(profile.id)
+              .then(() => void qc.invalidateQueries({ queryKey: ['oauth-status', profile.id] }))
               .catch((cause: unknown) => toast.error(describeError(cause)));
           },
         });

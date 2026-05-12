@@ -31,6 +31,8 @@ interface FormState {
   authMethod: AuthMethod;
   headerName: string;
   secret: string;
+  oauthScope: string;
+  oauthClientId: string;
   tagEnv: string;
   tagProject: string;
   tlsInsecure: boolean;
@@ -48,6 +50,8 @@ function initialState(editing?: Profile): FormState {
     authMethod: editing?.auth.method ?? 'none',
     headerName: editing?.auth.method === 'header' ? editing.auth.headerName : '',
     secret: '',
+    oauthScope: editing?.auth.method === 'oauth' ? (editing.auth.scope ?? '') : '',
+    oauthClientId: editing?.auth.method === 'oauth' ? (editing.auth.clientId ?? '') : '',
     tagEnv: editing?.tags?.env ?? '',
     tagProject: editing?.tags?.project ?? '',
     tlsInsecure: editing?.tlsInsecure ?? false,
@@ -55,9 +59,20 @@ function initialState(editing?: Profile): FormState {
   };
 }
 
+function authConfigOf(s: FormState): ProfileInput['auth'] {
+  if (s.authMethod === 'header') return { method: 'header', headerName: s.headerName.trim() };
+  if (s.authMethod === 'oauth') {
+    return {
+      method: 'oauth',
+      ...(s.oauthScope.trim() ? { scope: s.oauthScope.trim() } : {}),
+      ...(s.oauthClientId.trim() ? { clientId: s.oauthClientId.trim() } : {}),
+    };
+  }
+  return { method: s.authMethod };
+}
+
 function buildInput(s: FormState): ProfileInput {
-  const auth =
-    s.authMethod === 'header' ? { method: 'header' as const, headerName: s.headerName.trim() } : { method: s.authMethod };
+  const auth = authConfigOf(s);
   const tags =
     s.tagEnv.trim() || s.tagProject.trim()
       ? {
@@ -246,7 +261,7 @@ export function ProfileWizard({
           <div className={fieldClass}>
             <span className={labelClass}>{t('wizard.auth')}</span>
             <div className="flex gap-4 text-sm">
-              {(['none', 'bearer', 'header'] as const).map((method) => (
+              {(['none', 'bearer', 'header', 'oauth'] as const).map((method) => (
                 <label key={method} className="flex items-center gap-1.5">
                   <input
                     type="radio"
@@ -259,6 +274,33 @@ export function ProfileWizard({
               ))}
             </div>
           </div>
+
+          {state.authMethod === 'oauth' && (
+            <>
+              <div className={fieldClass}>
+                <label className={labelClass} htmlFor="wiz-oauth-scope">
+                  {t('wizard.oauthScope')}
+                </label>
+                <Input
+                  id="wiz-oauth-scope"
+                  placeholder="mcp"
+                  value={state.oauthScope}
+                  onChange={(e) => set('oauthScope', e.target.value)}
+                />
+              </div>
+              <div className={fieldClass}>
+                <label className={labelClass} htmlFor="wiz-oauth-client-id">
+                  {t('wizard.oauthClientId')}
+                </label>
+                <Input
+                  id="wiz-oauth-client-id"
+                  value={state.oauthClientId}
+                  onChange={(e) => set('oauthClientId', e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">{t('wizard.oauthClientIdHint')}</span>
+              </div>
+            </>
+          )}
 
           {state.authMethod === 'header' && (
             <div className={fieldClass}>

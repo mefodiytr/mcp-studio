@@ -1,18 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Plus, RotateCw, Server, Unplug } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { KeyRound, Loader2, LogOut, Plus, RotateCw, Server, Unplug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
 import { Button } from '@renderer/components/ui/button';
+import { invalidateOAuthStatusKey, useOAuthStatus, useSignOutOAuth } from '@renderer/lib/auth';
 import { connectProfile, disconnectConnection, reconnectConnection, useConnections } from '@renderer/lib/connections';
 import { describeError } from '@renderer/lib/errors';
 import { getCredentialHint, useCreateProfile, useDeleteProfile, useProfiles } from '@renderer/lib/profiles';
 import { fetchTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
+import type { OAuthStatus } from '@shared/domain/auth';
 import type { ConnectionSummary, ToolDescriptor } from '@shared/domain/connection';
 import type { Profile, ProfileInput } from '@shared/domain/profile';
 
 import { ProfileWizard } from './ProfileWizard';
+
+function oauthStatusKey(status: OAuthStatus): string {
+  if (status.state === 'signed-out') return 'connections.signInRequired';
+  if (status.state === 'expired') return 'connections.tokenExpired';
+  return 'connections.signedIn';
+}
 
 const DEV_PROFILE: ProfileInput = {
   transport: 'stdio',
@@ -60,14 +69,16 @@ export function ConnectionsView() {
   const profiles = profilesQuery.data ?? [];
   const versions = window.studio?.versions;
 
-  // Toast when a previously-connected session drops.
+  // Toast when a previously-connected session drops or needs re-auth.
   const prevStatus = useRef<Map<string, ConnectionSummary['status']>>(new Map());
   useEffect(() => {
     for (const c of connections) {
-      if (c.status === 'error' && prevStatus.current.get(c.connectionId) === 'connected') {
-        toast.error(t('connections.dropped', { name: c.serverInfo?.name ?? c.profileId }), {
-          description: c.error ?? undefined,
-        });
+      const was = prevStatus.current.get(c.connectionId);
+      const name = c.serverInfo?.name ?? c.profileId;
+      if (c.status === 'error' && was === 'connected') {
+        toast.error(t('connections.dropped', { name }), { description: c.error ?? undefined });
+      } else if (c.status === 'auth-required' && was === 'connected') {
+        toast.warning(t('connections.sessionExpired', { name }), { description: c.error ?? undefined });
       }
     }
     prevStatus.current = new Map(connections.map((c) => [c.connectionId, c.status]));
@@ -128,7 +139,11 @@ export function ConnectionsView() {
         ) : (
           <ul className="flex flex-col gap-3">
             {connections.map((connection) => (
-              <ConnectionCard key={connection.connectionId} connection={connection} />
+              <ConnectionCard
+                key={connection.connectionId}
+                connection={connection}
+                profileName={profiles.find((p) => p.id === connection.profileId)?.name}
+              />
             ))}
           </ul>
         )}
@@ -149,12 +164,16 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
   const { t } = useTranslation();
   const deleteProfile = useDeleteProfile();
   const createProfile = useCreateProfile();
+  const qc = useQueryClient();
+  const isOAuth = profile.auth.method === 'oauth';
+  const oauthStatus = useOAuthStatus(profile.id, isOAuth);
+  const signOut = useSignOutOAuth();
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
-    if (profile.auth.method === 'none') {
+    if (profile.auth.method === 'none' || profile.auth.method === 'oauth') {
       setHint(null);
       return;
     }
@@ -172,6 +191,7 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
     setConnectError(null);
     try {
       await connectProfile(profile.id);
+      if (isOAuth) void qc.invalidateQueries({ queryKey: invalidateOAuthStatusKey(profile.id) });
     } catch (cause) {
       const message = describeError(cause);
       setConnectError(message);
@@ -191,6 +211,7 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
             {t('connections.auth')}: {profile.auth.method}
             {profile.auth.method === 'header' && ` (${profile.auth.headerName})`}
             {hint && ` · ${hint}`}
+            {isOAuth && oauthStatus.data && ` · ${t(oauthStatusKey(oauthStatus.data))}`}
             {profile.tlsInsecure && ` · ${t('connections.tlsInsecureBadge')}`}
           </p>
           {(profile.tags?.env || profile.tags?.project) && (
@@ -210,6 +231,12 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
             {connecting && <Loader2 className="animate-spin" />}
             {t('connections.connect')}
           </Button>
+          {isOAuth && oauthStatus.data && oauthStatus.data.state !== 'signed-out' && (
+            <Button size="sm" variant="ghost" onClick={() => void signOut(profile.id)}>
+              <LogOut />
+              {t('connections.signOut')}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onEdit}>
             {t('connections.edit')}
           </Button>
@@ -231,13 +258,21 @@ function ProfileRow({ profile, onEdit }: { profile: Profile; onEdit: () => void 
   );
 }
 
-function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
+const DOT_BY_STATUS: Record<ConnectionSummary['status'], string> = {
+  'signing-in': 'bg-amber-500 animate-pulse',
+  connected: 'bg-emerald-500',
+  'auth-required': 'bg-amber-500',
+  error: 'bg-destructive',
+};
+
+function ConnectionCard({ connection, profileName }: { connection: ConnectionSummary; profileName?: string }) {
   const { t } = useTranslation();
   const [tools, setTools] = useState<ToolDescriptor[]>([]);
-  const errored = connection.status === 'error';
+  const connected = connection.status === 'connected';
+  const title = connection.serverInfo?.name ?? profileName ?? connection.profileId;
 
   useEffect(() => {
-    if (errored) {
+    if (!connected) {
       setTools([]);
       return;
     }
@@ -248,39 +283,57 @@ function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
     return () => {
       cancelled = true;
     };
-  }, [connection.connectionId, errored]);
+  }, [connection.connectionId, connected]);
 
   return (
     <li className="rounded-lg border bg-card p-4 text-card-foreground">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-medium">
-            <span
-              className={cn('size-1.5 shrink-0 rounded-full', errored ? 'bg-destructive' : 'bg-emerald-500')}
-              aria-hidden
-            />
-            {connection.serverInfo?.name ?? t('connections.unknownServer')}{' '}
-            <span className="text-muted-foreground">{connection.serverInfo?.version}</span>
+            <span className={cn('size-1.5 shrink-0 rounded-full', DOT_BY_STATUS[connection.status])} aria-hidden />
+            {title} {connection.serverInfo?.version && <span className="text-muted-foreground">{connection.serverInfo.version}</span>}
           </p>
-          <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>
-              {connection.transportKind}
-              {connection.latencyMs != null && ` · ${Math.round(connection.latencyMs)} ms`}
-              {' · '}
-              {connection.capabilities.tools} {t('connections.tools')} · {connection.capabilities.resources}{' '}
-              {t('connections.resources')} · {connection.capabilities.prompts} {t('connections.prompts')}
-            </span>
-            <Sparkline values={connection.latencyHistory} />
-          </p>
-          {connection.sessionId && (
-            <p className="text-xs text-muted-foreground">
-              {t('connections.sessionId')}: <span className="font-mono">{connection.sessionId}</span>
+          {connection.status === 'signing-in' && (
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="size-3 animate-spin" aria-hidden /> {t('connections.signingIn')}
             </p>
           )}
-          {errored && connection.error && <p className="mt-1 text-xs text-destructive">{connection.error}</p>}
+          {connected && (
+            <>
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  {connection.transportKind}
+                  {connection.latencyMs != null && ` · ${Math.round(connection.latencyMs)} ms`}
+                  {' · '}
+                  {connection.capabilities.tools} {t('connections.tools')} · {connection.capabilities.resources}{' '}
+                  {t('connections.resources')} · {connection.capabilities.prompts} {t('connections.prompts')}
+                </span>
+                <Sparkline values={connection.latencyHistory} />
+              </p>
+              {connection.sessionId && (
+                <p className="text-xs text-muted-foreground">
+                  {t('connections.sessionId')}: <span className="font-mono">{connection.sessionId}</span>
+                </p>
+              )}
+            </>
+          )}
+          {connection.status === 'auth-required' && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+              {connection.error ?? t('connections.sessionExpiredShort')}
+            </p>
+          )}
+          {connection.status === 'error' && connection.error && (
+            <p className="mt-1 text-xs text-destructive">{connection.error}</p>
+          )}
         </div>
         <div className="flex shrink-0 gap-1">
-          {errored && (
+          {connection.status === 'auth-required' && (
+            <Button size="sm" variant="outline" onClick={() => void reconnectConnection(connection.connectionId)}>
+              <KeyRound />
+              {t('connections.signIn')}
+            </Button>
+          )}
+          {connection.status === 'error' && (
             <Button size="sm" variant="outline" onClick={() => void reconnectConnection(connection.connectionId)}>
               <RotateCw />
               {t('connections.reconnect')}
@@ -288,7 +341,7 @@ function ConnectionCard({ connection }: { connection: ConnectionSummary }) {
           )}
           <Button size="sm" variant="ghost" onClick={() => void disconnectConnection(connection.connectionId)}>
             <Unplug />
-            {t('connections.disconnect')}
+            {connection.status === 'signing-in' ? t('connections.cancel') : t('connections.disconnect')}
           </Button>
         </div>
       </div>
