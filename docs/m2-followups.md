@@ -37,8 +37,17 @@ coordination items (which still apply).
   surfaces one Niagara connection at a time (the rail binds the first connected
   one). A `connectionId`-keyed split is a follow-up if multiple Niagara
   connections need independent trees. (`plugins/niagara/src/state/explorer-store.ts`)
-- **CodeMirror 6 availability (C44 risk, pre-flagged).** The BQL playground wants
-  a real code editor (CodeMirror 6, lazy-chunked). If the packages aren't in the
-  offline pnpm cache and the environment can't fetch them, C44 falls back to a
-  plain `<textarea>` editor (no syntax highlight / completion) and this is noted in
-  the milestone-2 build-adjustments section. (`plugins/niagara/src/views/...`)
+- **BQL playground editor (C44).** Shipped with CodeMirror 6 via
+  `@uiw/react-codemirror` (the pre-flagged offline-cache risk didn't bite — the
+  deps fetched fine, so no `<textarea>` fallback was needed). Two follow-ups:
+  - **Chunk weight.** The lazy `BqlView` chunk is ~840 kB — `@uiw/react-codemirror`
+    pulls the `codemirror` meta-package (basic-setup = autocomplete + search +
+    lint + commands + language + view + state). A hand-rolled CM6 integration
+    importing only `@codemirror/{state,view,commands,language}` would cut it
+    substantially. It's lazy-loaded (only when the BQL view opens on a Niagara
+    connection), so not urgent. (`plugins/niagara/src/views/BqlView.tsx`)
+  - **Editor theme.** The editor uses CodeMirror's default (light) theme
+    regardless of the app theme — add a dark variant keyed off the app's theme.
+  - **BQL highlighting is a minimal `StreamLanguage`** (keyword / string / number
+    / operator). A full Lezer grammar with completion (column names, type specs)
+    is a follow-up. (`plugins/niagara/src/lib/bql-lang.ts`)

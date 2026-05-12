@@ -7,6 +7,7 @@
  */
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
+import { parseTsv, type BqlResult } from './bql';
 import { fullOrd, ordLeaf, parentOrd } from './ord';
 
 /** A node in the station's slot hierarchy, as returned by `listChildren`. */
@@ -119,6 +120,18 @@ export interface SlotRow {
   value: string;
   /** Selected facets (units, precision, …) when the server includes them. */
   facets?: Record<string, unknown>;
+}
+
+/** Run a BQL query (`query` must already be the `<ord>|bql:<SELECT…>` form —
+ *  see {@link import('./bql').buildBqlQuery}); `limit` caps the row count
+ *  (1–1000). Returns the parsed TSV plus the raw body. */
+export async function bqlQuery(
+  ctx: PluginContext,
+  query: string,
+  limit: number,
+): Promise<BqlResult & { raw: string }> {
+  const raw = textContent(await ctx.callTool('bqlQuery', { query, limit }));
+  return { ...parseTsv(raw), raw };
 }
 
 export async function getSlots(ctx: PluginContext, ord: string): Promise<SlotRow[]> {
