@@ -1,20 +1,159 @@
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronRight, FileInput, Folder, FolderOpen } from 'lucide-react';
 import type { PluginContext } from '@mcp-studio/plugin-api';
+import { cn } from '@mcp-studio/ui';
+
+import { listChildren, type NiagaraNode } from '../lib/niagara-api';
+import { ordTrail, ROOT_ORD } from '../lib/ord';
+import { useExplorerStore } from '../state/explorer-store';
+
+const INDENT_PX = 14;
 
 /**
- * Placeholder station explorer. The real lazy/virtualised slot-hierarchy tree
- * (with breadcrumbs, property sheet, etc.) lands in C40+. For now this proves the
- * plugin-view wiring end to end: the host mounts it with a live `PluginContext`
- * bound to the active Niagara connection.
+ * The Niagara station explorer: a breadcrumb bar over a lazily-loaded slot tree.
+ * Children are fetched per node on expand (`listChildren`, React-Query-cached);
+ * selecting a node publishes its ORD as the `{{cwd}}` templating value. Property
+ * sheet / folder view / quick-nav layer on in later commits.
  */
 export function ExplorerView({ ctx }: { ctx: PluginContext }) {
-  const serverName = ctx.connection.serverInfo?.name ?? ctx.connection.connectionId;
+  const selected = useExplorerStore((s) => s.selected);
+  const reveal = useExplorerStore((s) => s.reveal);
+  const select = useExplorerStore((s) => s.select);
+
+  const navigate = (ord: string): void => {
+    reveal(ord);
+    ctx.setCwd(ord);
+  };
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-      <p className="text-sm font-medium text-foreground">Niagara station</p>
-      <p className="text-xs">
-        Connected to <span className="font-mono">{serverName}</span>
-      </p>
-      <p className="text-xs">The station explorer arrives in a later build.</p>
+    <div className="flex h-full flex-col">
+      <Breadcrumbs ord={selected ?? ROOT_ORD} onNavigate={navigate} />
+      <div role="tree" className="min-h-0 flex-1 overflow-auto py-1 text-sm">
+        <NodeChildren ctx={ctx} parentOrd={ROOT_ORD} depth={0} onSelect={(ord) => { select(ord); ctx.setCwd(ord); }} />
+      </div>
     </div>
   );
+}
+
+function Breadcrumbs({ ord, onNavigate }: { ord: string; onNavigate: (ord: string) => void }) {
+  const trail = ordTrail(ord);
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 border-b px-2 py-1.5 text-xs">
+      {trail.map((seg, i) => {
+        const last = i === trail.length - 1;
+        return (
+          <span key={seg.ord} className="flex items-center gap-0.5">
+            {i > 0 && <ChevronRight className="size-3 shrink-0 text-muted-foreground" aria-hidden />}
+            <button
+              type="button"
+              onClick={() => onNavigate(seg.ord)}
+              className={cn('rounded px-1 py-0.5 hover:bg-accent', last ? 'font-medium' : 'text-muted-foreground')}
+            >
+              {i === 0 ? 'Station' : seg.name}
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function NodeChildren({
+  ctx,
+  parentOrd,
+  depth,
+  onSelect,
+}: {
+  ctx: PluginContext;
+  parentOrd: string;
+  depth: number;
+  onSelect: (ord: string) => void;
+}) {
+  const remember = useExplorerStore((s) => s.remember);
+  const query = useQuery({
+    queryKey: ['niagara', ctx.connection.connectionId, 'children', parentOrd],
+    queryFn: () => listChildren(ctx, parentOrd),
+  });
+  useEffect(() => {
+    if (query.data) remember(query.data);
+  }, [query.data, remember]);
+
+  const pad = { paddingLeft: depth * INDENT_PX + 22 };
+  if (query.isPending) return <p style={pad} className="py-0.5 text-xs text-muted-foreground">Loading…</p>;
+  if (query.isError) {
+    return (
+      <p style={pad} className="py-0.5 text-xs text-destructive">
+        Couldn’t load children {query.error instanceof Error ? `— ${query.error.message}` : ''}
+      </p>
+    );
+  }
+  const children = query.data ?? [];
+  if (children.length === 0) return <p style={pad} className="py-0.5 text-xs italic text-muted-foreground">empty</p>;
+  return (
+    <>
+      {children.map((node) => (
+        <TreeNode key={node.ord} ctx={ctx} node={node} depth={depth} onSelect={onSelect} />
+      ))}
+    </>
+  );
+}
+
+function TreeNode({
+  ctx,
+  node,
+  depth,
+  onSelect,
+}: {
+  ctx: PluginContext;
+  node: NiagaraNode;
+  depth: number;
+  onSelect: (ord: string) => void;
+}) {
+  const expanded = useExplorerStore((s) => s.expanded.has(node.ord));
+  const isSelected = useExplorerStore((s) => s.selected === node.ord);
+  const toggle = useExplorerStore((s) => s.toggle);
+  const canExpand = !node.isPoint;
+
+  return (
+    <div role="treeitem" aria-selected={isSelected} aria-expanded={canExpand ? expanded : undefined}>
+      <div
+        onClick={() => onSelect(node.ord)}
+        title={node.ord}
+        className={cn(
+          'flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-accent',
+          isSelected && 'bg-accent',
+        )}
+        style={{ paddingLeft: depth * INDENT_PX + 4 }}
+      >
+        {canExpand ? (
+          <button
+            type="button"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggle(node.ord);
+            }}
+            className="shrink-0 rounded text-muted-foreground hover:text-foreground"
+          >
+            <ChevronRight className={cn('size-3.5 transition-transform', expanded && 'rotate-90')} />
+          </button>
+        ) : (
+          <span className="w-3.5 shrink-0" aria-hidden />
+        )}
+        <NodeIcon node={node} expanded={expanded} />
+        <span className="truncate">{node.displayName}</span>
+        {node.type && <span className="ml-1 truncate text-xs text-muted-foreground">{node.type}</span>}
+      </div>
+      {canExpand && expanded && (
+        <NodeChildren ctx={ctx} parentOrd={node.ord} depth={depth + 1} onSelect={onSelect} />
+      )}
+    </div>
+  );
+}
+
+function NodeIcon({ node, expanded }: { node: NiagaraNode; expanded: boolean }) {
+  // Type-aware icons land in C45; for now folder vs. point.
+  const Icon = node.isPoint ? FileInput : expanded ? FolderOpen : Folder;
+  return <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
 }
