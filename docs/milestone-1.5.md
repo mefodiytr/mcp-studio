@@ -227,10 +227,43 @@ Stop and check in only if:
 
 Otherwise: note-and-continue, surface it in the big check-in.
 
-## Big check-in after C32
+## Build adjustments (after kickoff)
 
-`git log --oneline` (C25–C32 + docs); a screenshot of the OAuth-enabled wizard +
-a signed-in connection card + the expired-token re-auth flow; `pnpm test:e2e`
-green ×3 with no flake; the coverage report (mcp-client floor raised, schema-form
-unchanged, desktop unit); the tag `v0.1.5-m1.5`. Then M2 — starting with
-`packages/plugin-api` so the Niagara plugin builds on a finished contract.
+Refinements that surfaced during C25–C32 — recorded so this plan matches what
+actually shipped:
+
+- **No `response_types` in the registration metadata** [C25]. The SDK sets
+  `response_type=code` in the authorize-URL builder anyway; including it in
+  `clientMetadata` only risked an excess-property type error against the SDK's
+  schema. Follow the SDK, not the doc.
+- **No discovered-metadata caching** [C25]. The SDK's `OAuthClientProvider` has no
+  `saveMetadata`/`metadata()` hook — it re-discovers each `auth()` call (two cheap
+  `GET`s, cacheable at the HTTP layer). `OAuthArtifacts = { tokens?, tokensSavedAt?,
+  clientInfo? }` is the minimal sufficient shape.
+- **The wizard's `clientId` field is shown whenever `oauth` is selected** [C29],
+  with a hint, rather than hidden-until-a-first-connect-shows-no-`registration_
+  endpoint`. Simpler, and the connect error mentions registration so the user
+  knows to fill it. The hidden-then-surfaced refinement is a follow-up.
+- **No dedicated proactive-refresh-at-~80%-lifetime timer** [C30]. The SDK's
+  transport transparently refreshes-and-retries on a 401 (so user requests never
+  fail), and the existing 15 s latency ping triggers a refresh promptly after
+  expiry — OAuth connections stay alive seamlessly. A true proactive refresh would
+  risk popping the browser if the refresh token's been revoked (the "surprising
+  UX" we want to avoid) or need a reimplemented discovery+refresh chain with a
+  no-redirect guard — out of scope; a follow-up. The displayed expiry is kept
+  fresh by re-reading the vault on each poll.
+- **The protocol inspector doesn't yet show the OAuth `.well-known`/token round-
+  trips** [C30]. The transport *does* accept a custom `fetch` it forwards to the
+  SDK's `auth()`, so it's tappable — but surfacing non-JSON-RPC HTTP events needs a
+  new protocol-event variant + tap method + inspector rendering. A follow-up.
+- **No new `mcp-client` unit tests in C31; the OAuth handshake is covered by the
+  e2e instead** [C31]. `mcp-client` doesn't reimplement discovery / token parsing /
+  refresh (the SDK does), so unit-testing those would test the SDK. The
+  `mcp-client` floor was nudged to 78/60/78/80 anyway (actual ~80/87/66/80).
+- **The OAuth e2e runs the SDK's own `examples/server/simpleStreamableHttp.js
+  --oauth`** (its `DemoInMemory` auth provider auto-approves and supports DCR) on
+  free ports, rather than a self-rolled `tests/fixtures/oauth-server/` — the SDK's
+  example is exactly the test server we'd have written. A `MCPSTUDIO_OAUTH_AUTOAPPROVE`
+  env hook makes `redirectToAuthorization` complete the flow headlessly.
+
+See `docs/m1-followups.md` → "M1.5 / OAuth follow-ups" for the deferred items.

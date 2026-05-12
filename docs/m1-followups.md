@@ -62,4 +62,37 @@ Nothing here blocks the M1 deliverable; this is the "we know about it" list.
   palette has an in-shell list with a `when` predicate). → **M2 (first commit),
   so the Niagara plugin starts on a finished contract.**
 - better-sqlite3 store (the M1 store is a self-rolled atomic JSON store). → **M4.**
-- OAuth. → **M1.5 — the mini-milestone between M1 and M2.**
+- OAuth — **done (M1.5, `v0.1.5-m1.5`).** See `docs/milestone-1.5.md`.
+
+## M1.5 / OAuth follow-ups
+
+Deliberately deferred from M1.5 (`docs/milestone-1.5.md` has the per-commit
+rationale). None blocks the milestone; OAuth works end-to-end (the Playwright e2e
+covers discovery → DCR → authorize → token exchange → connect → invoke).
+
+- **Proactive refresh at ~80% token lifetime.** M1.5 relies on the SDK's
+  transparent refresh-on-401 + the 15 s latency ping — connections stay alive
+  seamlessly, but the first request after expiry is a refresh-then-retry rather
+  than already-refreshed. A dedicated proactive refresh needs a no-redirect refresh
+  path (so it can't pop the browser if the refresh token's been revoked).
+  (`ConnectionManager.pollLatency`, `mcp-client`)
+- **OAuth round-trips in the protocol inspector.** The `.well-known` discovery,
+  DCR `register`, `authorize`, and `token` calls go via `fetch` (not the MCP
+  transport), so the C9 tap doesn't see them. The transport accepts a custom
+  `fetch` it forwards to the SDK's `auth()`, so it's tappable — needs a new
+  protocol-event variant (HTTP, not JSON-RPC) + a tap method + inspector rendering.
+- **Hidden-then-surfaced `clientId` field in the wizard.** M1.5 always shows the
+  pre-registered-client-ID field for OAuth profiles (with a hint). The plan's UX
+  was: hide it until a first connect shows the server has no `registration_endpoint`,
+  then surface it inline. Needs a way to thread "this profile needs a client ID"
+  from the connect failure to the wizard. (`ProfileWizard`, `ConnectionsView`)
+- **Custom URL-scheme redirect (`mcpstudio://`).** M1.5 uses a loopback HTTP
+  listener (RFC 8252 §7.3) — fine in dev and packaged, but some corporate
+  environments block loopback listeners. A custom-scheme option (`setAsDefaultProtocolClient`
+  + `open-url` / `second-instance` argv) is the fallback.
+- **RFC 7592 DCR `DELETE` on sign-out.** `oauth:signOut` drops the local token +
+  client info but doesn't `DELETE` the dynamically-registered client at the server
+  (would need a re-discovery just to clean up; servers expire unused DCR clients).
+- **`mcp-client` transport coverage.** The HTTP/SSE transports and the
+  disconnect/error paths still want dedicated unit tests; raise the `mcp-client`
+  coverage floor (currently 78/60/78/80) when they land.

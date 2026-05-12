@@ -555,6 +555,16 @@ Monorepo via pnpm workspaces. Single `pnpm dev` to launch Electron with hot relo
 
 См. `docs/m1-followups.md` — полный список отложенного из M1 с указанием, куда оно встаёт.
 
+### M1.5 — OAuth (2026-05-12, `v0.1.5-m1.5`)
+
+Третий auth-метод (наряду с none / bearer / header): **OAuth 2.1 + PKCE**. План — `docs/milestone-1.5.md` (commits C25–C32).
+
+- **Что делает SDK, что делаем мы.** `@modelcontextprotocol/sdk` уже реализует (и тестирует) discovery (`.well-known/oauth-protected-resource` → `.well-known/oauth-authorization-server` (RFC 8414) → `openid-configuration`), PKCE (S256), `auth()`-оркестратор, DCR (RFC 7591), code-exchange, refresh, и в транспортах — try-token → refresh-on-401 → `redirectToAuthorization` + `UnauthorizedError`. Мы пишем: реализацию SDK-интерфейса `OAuthClientProvider` (`packages/mcp-client/src/oauth.ts` — storage-агностичная, вшивается в credential vault), loopback-redirect-listener в main (`main/oauth/redirect.ts`, RFC 8252 §7.3 — one-shot `127.0.0.1:<ephemeral>/callback`), glue в `ConnectionManager.connectOAuth` (`Connection.create({authProvider})` → has-token / `PendingAuthError`→`waitForCallback`→`finishAuth`→reconnect; refresh-then-reject-guard с max-1-retry; mid-session 401 → `auth-required`, no auto-retry; cancellation pathway закрывает listener немедленно — no orphans), wizard-секцию (`oauth`-radio + scope + pre-registered client-id с hint'ом), sign-in/out UI + command-palette-команды, и e2e против SDK-демо-сервера (`examples/server/simpleStreamableHttp.js --oauth`, headless через `MCPSTUDIO_OAUTH_AUTOAPPROVE`).
+- **Хранение.** Токены + DCR client-info (+ `tokensSavedAt` для absolute-expiry) — одним зашифрованным JSON-блобом per profile в credential vault (`schemaVersion` 1→2). PKCE-verifier — только in-memory. Renderer видит только redacted status (`oauth:status` → signed-out/signed-in/expired + expiresAt + scope; `oauth:signOut`).
+- **DCR с fallback.** DCR используется, если auth-server-metadata содержит `registration_endpoint`; иначе — manually-entered `client_id` (`auth: {method:'oauth', scope?, clientId?}`).
+- **Redirect — loopback** (не custom URL scheme): RFC-blessed для native-приложений, работает в dev и packaged, system browser через `shell.openExternal`, никогда in-app `BrowserWindow`.
+- Build-adjustments и deferred-items — `docs/milestone-1.5.md` → "Build adjustments" и `docs/m1-followups.md` → "M1.5 / OAuth follow-ups" (proactive-refresh-at-80%, OAuth-round-trips в inspector'е, hidden-then-surfaced client-id field, custom-URL-scheme redirect, RFC-7592 DCR-DELETE на sign-out).
+
 ---
 
 ## Next step
