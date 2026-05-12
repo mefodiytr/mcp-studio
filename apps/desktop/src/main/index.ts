@@ -145,6 +145,7 @@ if (!gotSingleInstanceLock) {
       pidTracker,
       protocolTap,
       toolHistory,
+      (url) => void shell.openExternal(url),
       (connections) => emitToRenderers('connections:changed', { connections }),
       () => emitToRenderers('history:changed', {}),
     );

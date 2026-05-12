@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { Connection, McpError, type TransportConfig } from '@mcp-studio/mcp-client';
+import {
+  Connection,
+  McpError,
+  PendingAuthError,
+  StudioOAuthClientProvider,
+  UnauthorizedError,
+  type TransportConfig,
+} from '@mcp-studio/mcp-client';
 
 import type { ConnectionSummary, ToolDescriptor } from '../../shared/domain/connection';
 import type { Profile } from '../../shared/domain/profile';
@@ -14,17 +21,22 @@ import type { RawRequestOutcome, ToolCallOutcome } from '../../shared/domain/too
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import type { ToolHistoryRepository } from '../store/tool-history-repository';
+import { startLoopbackRedirect, type LoopbackRedirect } from '../oauth/redirect';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
 import type { ProtocolTap } from './protocol-tap';
 
 const LATENCY_HISTORY_CAP = 20;
 const LATENCY_POLL_MS = 15_000;
+const CLIENT_INFO = { name: 'mcp-studio', version: '0.1.0' };
 
 interface Managed {
   connectionId: string;
   profileId: string;
-  connection: Connection;
+  /** The live session — absent on a `signing-in` placeholder. */
+  connection?: Connection;
   childPid?: number;
+  /** The in-flight OAuth loopback listener — present only while `signing-in`. */
+  redirect?: LoopbackRedirect;
   summary: ConnectionSummary;
 }
 
@@ -40,7 +52,7 @@ function transportConfigFor(profile: Profile): TransportConfig {
 }
 
 function headersFor(profile: Profile, vault: CredentialVault): Record<string, string> | undefined {
-  if (profile.auth.method === 'none') return undefined;
+  if (profile.auth.method === 'none' || profile.auth.method === 'oauth') return undefined;
   const secret = vault.getSecret(profile.id);
   if (!secret) return undefined; // no secret stored yet — connect unauthenticated
   return profile.auth.method === 'bearer'
@@ -51,9 +63,9 @@ function headersFor(profile: Profile, vault: CredentialVault): Record<string, st
 /**
  * Holds the live MCP sessions (one entry per connect attempt). Multiple
  * simultaneous connections are allowed; a dropped session stays in the map with
- * status "error" until disconnected or reconnected. Latency is sampled at
- * connect time and re-sampled periodically (per-request timing is the protocol
- * tap, C9).
+ * status "error" / "auth-required" until disconnected or reconnected. An OAuth
+ * sign-in shows as a "signing-in" placeholder while the browser flow runs.
+ * Latency is sampled at connect time and re-sampled periodically.
  */
 export class ConnectionManager {
   private readonly connections = new Map<string, Managed>();
@@ -64,6 +76,8 @@ export class ConnectionManager {
     private readonly pidTracker: StdioPidTracker,
     private readonly tap: ProtocolTap,
     private readonly history: ToolHistoryRepository,
+    /** Open a URL in the user's browser (the OAuth authorization redirect). */
+    private readonly openExternal: (url: string) => void,
     private readonly onChanged: (summaries: ConnectionSummary[]) => void,
     private readonly onHistoryChanged: () => void,
   ) {
@@ -76,53 +90,137 @@ export class ConnectionManager {
 
   async connect(profileId: string, connectionId: string = randomUUID()): Promise<ConnectionSummary> {
     const profile = this.repo.get(profileId); // throws ProfileNotFoundError if absent
+    if (profile.auth.method === 'oauth') return this.connectOAuth(profile, connectionId);
     const connection = await Connection.create(transportConfigFor(profile), {
-      clientInfo: { name: 'mcp-studio', version: '0.1.0' },
+      clientInfo: CLIENT_INFO,
       headers: headersFor(profile, this.vault),
       onMessage: (direction, message) => this.tap.record(connectionId, direction, message),
     });
-
     try {
-      const caps = connection.capabilities;
-      const counts = {
-        tools: caps?.tools ? (await connection.listTools()).length : 0,
-        resources: caps?.resources ? (await connection.listResources()).length : 0,
-        prompts: caps?.prompts ? (await connection.listPrompts()).length : 0,
-      };
-      const latencyMs = await connection.ping().catch(() => null);
-
-      const childPid = connection.childPid;
-      if (childPid !== undefined) this.pidTracker.add(childPid, profileId);
-
-      const summary: ConnectionSummary = {
-        connectionId,
-        profileId,
-        transportKind: connection.transportKind,
-        status: 'connected',
-        serverInfo: connection.serverInfo
-          ? {
-              name: connection.serverInfo.name,
-              version: connection.serverInfo.version,
-              title: connection.serverInfo.title,
-            }
-          : null,
-        capabilities: counts,
-        latencyMs,
-        latencyHistory: latencyMs != null ? [latencyMs] : [],
-        sessionId: connection.sessionId ?? null,
-        error: null,
-      };
-
-      connection.onClose = () => this.markErrored(connectionId, 'Connection closed by the server');
-      connection.onError = (cause) => this.markErrored(connectionId, cause.message);
-      this.connections.set(connectionId, { connectionId, profileId, connection, childPid, summary });
-      this.emitChanged();
-      return summary;
+      return await this.finalizeConnection(connectionId, profileId, connection);
     } catch (cause) {
-      // Don't leak a half-initialised session (e.g. an stdio child).
-      await connection.close().catch(() => undefined);
+      await connection.close().catch(() => undefined); // don't leak a half-initialised session
       throw cause;
     }
+  }
+
+  private async connectOAuth(profile: Profile, connectionId: string): Promise<ConnectionSummary> {
+    const { auth } = profile;
+    if (auth.method !== 'oauth') throw new Error('connectOAuth called for a non-OAuth profile');
+    const redirect = await startLoopbackRedirect();
+    const provider = new StudioOAuthClientProvider(
+      {
+        clientName: 'MCP Studio',
+        redirectUrl: redirect.redirectUri,
+        ...(auth.scope ? { scope: auth.scope } : {}),
+        ...(auth.clientId ? { staticClientId: auth.clientId } : {}),
+      },
+      {
+        load: () => this.vault.getOAuthArtifacts(profile.id),
+        save: (artifacts) => this.vault.setOAuthArtifacts(profile.id, artifacts),
+        redirectToAuthorization: (url) => {
+          // The browser is about to open — show a "signing in" row so the user
+          // can see (and cancel) the pending flow.
+          this.connections.set(connectionId, {
+            connectionId,
+            profileId: profile.id,
+            redirect,
+            summary: {
+              connectionId,
+              profileId: profile.id,
+              transportKind: profile.transport,
+              status: 'signing-in',
+              serverInfo: null,
+              capabilities: { tools: 0, resources: 0, prompts: 0 },
+              latencyMs: null,
+              latencyHistory: [],
+              sessionId: null,
+              error: null,
+            },
+          });
+          this.emitChanged();
+          this.openExternal(url.toString());
+        },
+      },
+    );
+    const config = transportConfigFor(profile);
+    let connection: Connection;
+    try {
+      connection = await Connection.create(config, {
+        clientInfo: CLIENT_INFO,
+        authProvider: provider,
+        onMessage: (direction, message) => this.tap.record(connectionId, direction, message),
+      });
+    } catch (cause) {
+      if (!(cause instanceof PendingAuthError)) {
+        redirect.close(); // never used (failed before the redirect) — just tear it down
+        throw cause;
+      }
+      // The authorization redirect has fired (the placeholder is in the map).
+      let code: string;
+      try {
+        ({ code } = await redirect.waitForCallback());
+      } catch (callbackError) {
+        redirect.close();
+        this.markErrored(
+          connectionId,
+          callbackError instanceof Error ? callbackError.message : 'Sign-in did not complete',
+          { authRequired: true },
+        );
+        throw callbackError;
+      }
+      try {
+        // finishAuth exchanges the code → tokens (persisted via the provider)
+        // then connects fresh. If it *also* needs auth, don't loop — bail.
+        connection = await cause.finishAuth(code);
+      } catch (finishError) {
+        redirect.close();
+        this.markErrored(connectionId, 'Sign-in failed — please try signing in again', { authRequired: true });
+        throw finishError;
+      }
+    }
+    redirect.close(); // idempotent — a successful callback already tore it down
+    return this.finalizeConnection(connectionId, profile.id, connection);
+  }
+
+  /** Probe a freshly-connected session, register it, and emit. Replaces any
+   *  `signing-in` placeholder for the same connectionId. */
+  private async finalizeConnection(
+    connectionId: string,
+    profileId: string,
+    connection: Connection,
+  ): Promise<ConnectionSummary> {
+    const caps = connection.capabilities;
+    const counts = {
+      tools: caps?.tools ? (await connection.listTools()).length : 0,
+      resources: caps?.resources ? (await connection.listResources()).length : 0,
+      prompts: caps?.prompts ? (await connection.listPrompts()).length : 0,
+    };
+    const latencyMs = await connection.ping().catch(() => null);
+    const childPid = connection.childPid;
+    if (childPid !== undefined) this.pidTracker.add(childPid, profileId);
+
+    const summary: ConnectionSummary = {
+      connectionId,
+      profileId,
+      transportKind: connection.transportKind,
+      status: 'connected',
+      serverInfo: connection.serverInfo
+        ? { name: connection.serverInfo.name, version: connection.serverInfo.version, title: connection.serverInfo.title }
+        : null,
+      capabilities: counts,
+      latencyMs,
+      latencyHistory: latencyMs != null ? [latencyMs] : [],
+      sessionId: connection.sessionId ?? null,
+      error: null,
+    };
+
+    connection.onClose = () => this.markErrored(connectionId, 'Connection closed by the server');
+    connection.onError = (cause) =>
+      this.markErrored(connectionId, cause.message, { authRequired: cause instanceof UnauthorizedError });
+    this.connections.set(connectionId, { connectionId, profileId, connection, childPid, summary });
+    this.emitChanged();
+    return summary;
   }
 
   async reconnect(connectionId: string): Promise<ConnectionSummary> {
@@ -138,7 +236,8 @@ export class ConnectionManager {
     if (!managed) return;
     this.connections.delete(connectionId);
     try {
-      await managed.connection.close();
+      managed.redirect?.close(); // cancel a pending OAuth sign-in immediately — no orphan listener
+      if (managed.connection) await managed.connection.close();
     } finally {
       if (managed.childPid !== undefined) this.pidTracker.remove(managed.childPid);
       this.tap.forget(connectionId);
@@ -156,7 +255,7 @@ export class ConnectionManager {
   }
 
   async listTools(connectionId: string): Promise<ToolDescriptor[]> {
-    return (await this.requireConnected(connectionId).connection.listTools()).map((tool) => ({
+    return (await this.requireConnected(connectionId).listTools()).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,
@@ -170,11 +269,12 @@ export class ConnectionManager {
     toolName: string,
     args?: Record<string, unknown>,
   ): Promise<ToolCallOutcome> {
-    const managed = this.requireConnected(connectionId);
+    const managed = this.requireManaged(connectionId);
+    const connection = this.requireConnected(connectionId);
     const startedAt = performance.now();
     let outcome: ToolCallOutcome;
     try {
-      outcome = { result: await managed.connection.callTool(toolName, args), error: null };
+      outcome = { result: await connection.callTool(toolName, args), error: null };
     } catch (cause) {
       const error =
         cause instanceof McpError
@@ -205,7 +305,7 @@ export class ConnectionManager {
   }
 
   async listResources(connectionId: string): Promise<ResourceDescriptor[]> {
-    return (await this.requireConnected(connectionId).connection.listResources()).map((r) => ({
+    return (await this.requireConnected(connectionId).listResources()).map((r) => ({
       uri: r.uri,
       name: r.name,
       title: r.title,
@@ -216,7 +316,7 @@ export class ConnectionManager {
   }
 
   async listResourceTemplates(connectionId: string): Promise<ResourceTemplateDescriptor[]> {
-    const connection = this.requireConnected(connectionId).connection;
+    const connection = this.requireConnected(connectionId);
     // Many servers advertise `resources` but don't implement
     // `resources/templates/list` — treat that (and any RPC-level error here)
     // as "no templates" rather than failing the whole panel.
@@ -234,28 +334,20 @@ export class ConnectionManager {
   }
 
   async readResource(connectionId: string, uri: string): Promise<ReadResourceResult> {
-    return this.requireConnected(connectionId).connection.readResource(uri);
+    return this.requireConnected(connectionId).readResource(uri);
   }
 
   async listPrompts(connectionId: string): Promise<PromptDescriptor[]> {
-    return (await this.requireConnected(connectionId).connection.listPrompts()).map((p) => ({
+    return (await this.requireConnected(connectionId).listPrompts()).map((p) => ({
       name: p.name,
       title: p.title,
       description: p.description,
-      arguments: p.arguments?.map((a) => ({
-        name: a.name,
-        description: a.description,
-        required: a.required,
-      })),
+      arguments: p.arguments?.map((a) => ({ name: a.name, description: a.description, required: a.required })),
     }));
   }
 
-  async getPrompt(
-    connectionId: string,
-    name: string,
-    args?: Record<string, string>,
-  ): Promise<GetPromptResult> {
-    return this.requireConnected(connectionId).connection.getPrompt(name, args);
+  async getPrompt(connectionId: string, name: string, args?: Record<string, string>): Promise<GetPromptResult> {
+    return this.requireConnected(connectionId).getPrompt(name, args);
   }
 
   async rawRequest(
@@ -263,7 +355,7 @@ export class ConnectionManager {
     method: string,
     params?: Record<string, unknown>,
   ): Promise<RawRequestOutcome> {
-    const connection = this.requireConnected(connectionId).connection;
+    const connection = this.requireConnected(connectionId);
     try {
       return { ok: true, result: await connection.rawRequest(method, params), error: null };
     } catch (cause) {
@@ -275,20 +367,27 @@ export class ConnectionManager {
     }
   }
 
-  private requireConnected(connectionId: string): Managed {
+  private requireManaged(connectionId: string): Managed {
     const managed = this.connections.get(connectionId);
-    if (!managed || managed.summary.status !== 'connected') {
-      throw new Error(`Connection ${connectionId} is not available`);
-    }
+    if (!managed) throw new Error(`Connection ${connectionId} is not available`);
     return managed;
   }
 
+  private requireConnected(connectionId: string): Connection {
+    const managed = this.requireManaged(connectionId);
+    if (!managed.connection || managed.summary.status !== 'connected') {
+      throw new Error(`Connection ${connectionId} is not available`);
+    }
+    return managed.connection;
+  }
+
   private async pollLatency(): Promise<void> {
-    const alive = [...this.connections.values()].filter((m) => m.summary.status === 'connected');
+    const alive = [...this.connections.values()].filter((m) => m.connection && m.summary.status === 'connected');
     if (alive.length === 0) return;
     let changed = false;
     await Promise.all(
       alive.map(async (managed) => {
+        if (!managed.connection) return;
         try {
           const latencyMs = await managed.connection.ping();
           const latencyHistory = [...managed.summary.latencyHistory, latencyMs].slice(-LATENCY_HISTORY_CAP);
@@ -302,11 +401,11 @@ export class ConnectionManager {
     if (changed) this.emitChanged();
   }
 
-  private markErrored(connectionId: string, message: string): void {
+  private markErrored(connectionId: string, message: string, opts: { authRequired?: boolean } = {}): void {
     const managed = this.connections.get(connectionId);
-    if (!managed || managed.summary.status === 'error') return;
+    if (!managed || managed.summary.status === 'error' || managed.summary.status === 'auth-required') return;
     if (managed.childPid !== undefined) this.pidTracker.remove(managed.childPid);
-    managed.summary = { ...managed.summary, status: 'error', error: message };
+    managed.summary = { ...managed.summary, status: opts.authRequired ? 'auth-required' : 'error', error: message };
     this.emitChanged();
   }
 

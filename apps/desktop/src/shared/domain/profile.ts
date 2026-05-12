@@ -17,6 +17,16 @@ export const authConfigSchema = z.discriminatedUnion('method', [
   z.object({ method: z.literal('none') }),
   z.object({ method: z.literal('bearer') }),
   z.object({ method: z.literal('header'), headerName: z.string().min(1) }),
+  // OAuth 2.1 + PKCE (http/sse only). `scope` is optional; `clientId` is only
+  // needed for servers that don't support dynamic client registration — the
+  // wizard surfaces that field after a first connect shows there's no
+  // registration endpoint. No secret is stored here; tokens + DCR client info
+  // live in the credential vault.
+  z.object({
+    method: z.literal('oauth'),
+    scope: z.string().min(1).optional(),
+    clientId: z.string().min(1).optional(),
+  }),
 ]);
 export type AuthConfig = z.infer<typeof authConfigSchema>;
 

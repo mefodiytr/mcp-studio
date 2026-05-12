@@ -17,7 +17,9 @@ import { cn } from '@renderer/lib/utils';
 import type { Profile, ProfileInput } from '@shared/domain/profile';
 
 type TransportKind = 'http' | 'stdio';
-type AuthMethod = 'none' | 'bearer' | 'header';
+// 'oauth' is accepted (so editing an OAuth profile works) but the radio for it
+// is added in C29 along with the scope / pre-registered-client-id fields.
+type AuthMethod = 'none' | 'bearer' | 'header' | 'oauth';
 
 interface FormState {
   name: string;
@@ -274,7 +276,7 @@ export function ProfileWizard({
             </div>
           )}
 
-          {state.authMethod !== 'none' && (
+          {(state.authMethod === 'bearer' || state.authMethod === 'header') && (
             <div className={fieldClass}>
               <label className={labelClass} htmlFor="wiz-secret">
                 {t('wizard.secret')}

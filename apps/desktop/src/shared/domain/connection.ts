@@ -1,11 +1,14 @@
 import { z } from 'zod';
 
-/** A snapshot of a connection (live or errored), safe to send to the renderer. */
+/** A snapshot of a connection (live or errored), safe to send to the renderer.
+ *  `signing-in`: an OAuth authorization flow is in progress (browser open).
+ *  `auth-required`: a (re-)sign-in is needed — the access token is gone and
+ *  couldn't be refreshed. */
 export const connectionSummarySchema = z.object({
   connectionId: z.string(),
   profileId: z.string(),
   transportKind: z.enum(['http', 'sse', 'stdio']),
-  status: z.enum(['connected', 'error']),
+  status: z.enum(['signing-in', 'connected', 'auth-required', 'error']),
   serverInfo: z.object({ name: z.string(), version: z.string(), title: z.string().optional() }).nullable(),
   capabilities: z.object({ tools: z.number(), resources: z.number(), prompts: z.number() }),
   /** Latest MCP-ping round-trip, in ms (null if unknown). */
