@@ -25,7 +25,8 @@ describe('pickPlugin', () => {
     expect(pickPlugin(undefined, [niagara, fs])).toBeUndefined();
   });
 
-  it('defaults to the (currently empty) in-box registry', () => {
-    expect(pickPlugin({ name: 'anything' })).toBeUndefined();
+  it('uses the in-box registry by default — the Niagara plugin matches niagaramcp', () => {
+    expect(pickPlugin({ name: 'niagaramcp' })?.manifest.name).toBe('niagara');
+    expect(pickPlugin({ name: 'echo-server' })).toBeUndefined();
   });
 });

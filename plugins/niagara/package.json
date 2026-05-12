@@ -1,0 +1,23 @@
+{
+  "name": "@mcp-studio/niagara",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP Studio in-box plugin: a read-only Niagara station browser (works against niagaramcp).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mcp-studio/plugin-api": "workspace:*",
+    "lucide-react": "^0.469.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18"
+  }
+}
