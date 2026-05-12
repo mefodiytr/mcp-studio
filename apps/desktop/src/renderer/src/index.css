@@ -3,6 +3,7 @@
 
 /* Workspace packages whose components ship Tailwind classes. */
 @source '../../../../../packages/schema-form/src';
+@source '../../../../../packages/ui/src';
 
 @custom-variant dark (&:is(.dark *));
 
