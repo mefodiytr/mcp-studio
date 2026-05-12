@@ -115,13 +115,23 @@ affect MCP Studio's behaviour against it.
   property sheet (C41) and BQL result table (C44) want the canonical form (with
   the localized string available separately for display, if at all). Until fixed,
   the Niagara plugin renders whatever the server sends. *(niagaramcp work.)*
-- **`bqlQuery` input format is hostile.** It requires a fully-qualified ORD
-  prefix (`station:|slot:/|bql:…`) on the query string; a plain `SELECT …` is
-  rejected. niagaramcp should either accept a plain `SELECT` and prepend a default
-  base ORD when no prefix is present, or split it into two fields (`baseOrd` +
-  `query`). The C44 BQL playground will paper over this on the client side
-  meanwhile (prepend a sensible default), but it's a server-side wart. *(niagaramcp
-  work.)*
+- **`bqlQuery` input format is hostile.** Two warts on the same tool:
+  - It requires a fully-qualified ORD prefix on the `query` string —
+    `station:|slot:/<path>|bql:select …` — a plain `SELECT …` is rejected.
+    niagaramcp should either accept a plain `SELECT` and prepend a default base
+    ORD when no prefix is present, or split it into two args (`baseOrd` + `query`).
+  - Putting a SQL-style `LIMIT N` *in the query string* silently fails with a
+    misleading error: Niagara BQL has no `LIMIT` clause — row-capping is the
+    tool's separate `limit` arg (max 1000, default 100) — and the station's BQL
+    tokenizer chokes on `limit`, with error-truncation then swallowing everything
+    from the type name onward (so the message looks like a type error). niagaramcp
+    should either accept `LIMIT N` in the query and translate it to the `limit`
+    arg, or validate the query for a stray `limit`/`LIMIT` and return a helpful
+    error pointing at the arg.
+
+  The C44 BQL playground papers over both client-side (prepend a default ORD
+  prefix; surface `limit` as a dedicated control, never let it into the query
+  text), but they're server-side warts. *(niagaramcp work.)*
 - **`rotateMcpToken` coordination** — see `docs/milestone-2.md` D5: the
   BearerResolver / user-Bearer write-auth flow (the `mcp:tokenHash` Tag) is **M3**,
   designed there alongside niagaramcp's token-rotation tool.
