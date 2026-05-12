@@ -129,7 +129,13 @@ export function AppShell() {
   const activePlugin = pluginConnection ? pickPlugin(pluginConnection.serverInfo) : undefined;
 
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const commands = useAppCommands({ view: activeBuiltinView, setView: focusOrOpen, inspectorOpen, setInspectorOpen });
+  const commands = useAppCommands({
+    view: activeBuiltinView,
+    setView: focusOrOpen,
+    inspectorOpen,
+    setInspectorOpen,
+    pluginConnection,
+  });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {

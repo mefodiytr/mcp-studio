@@ -7,14 +7,16 @@ import { signOutOAuth } from '@renderer/lib/auth';
 import { connectProfile, disconnectConnection, useConnections } from '@renderer/lib/connections';
 import { describeError } from '@renderer/lib/errors';
 import { clearHistory, useHistory } from '@renderer/lib/history';
+import { buildPluginContext } from '@renderer/lib/plugin-context';
 import { useProfiles } from '@renderer/lib/profiles';
 import { useTheme } from '@renderer/lib/theme';
 import { callTool } from '@renderer/lib/tools';
+import { pickPlugin } from '@renderer/plugins/registry';
 
 import type { AppView } from '@renderer/app/LeftRail';
+import type { ConnectionSummary } from '@shared/domain/connection';
 
-/** One entry in the command palette. `when: false` hides it (context scoping);
- *  the full plugin-contributed registry arrives with the plugin API in M2. */
+/** One entry in the command palette. `when: false` hides it (context scoping). */
 export interface Command {
   id: string;
   title: string;
@@ -29,6 +31,9 @@ interface ShellHandle {
   setView: (view: AppView) => void;
   inspectorOpen: boolean;
   setInspectorOpen: (open: boolean | ((open: boolean) => boolean)) => void;
+  /** The connection whose plugin (if any) contributes commands — the active
+   *  plugin connection (see AppShell). Undefined when none is connected. */
+  pluginConnection?: ConnectionSummary;
 }
 
 const VIEW_KEYS: { view: AppView; navKey: string }[] = [
@@ -40,7 +45,13 @@ const VIEW_KEYS: { view: AppView; navKey: string }[] = [
   { view: 'raw', navKey: 'raw' },
 ];
 
-export function useAppCommands({ view, setView, inspectorOpen, setInspectorOpen }: ShellHandle): Command[] {
+export function useAppCommands({
+  view,
+  setView,
+  inspectorOpen,
+  setInspectorOpen,
+  pluginConnection,
+}: ShellHandle): Command[] {
   const { t } = useTranslation();
   const { cycleTheme } = useTheme();
   const qc = useQueryClient();
@@ -163,6 +174,28 @@ export function useAppCommands({ view, setView, inspectorOpen, setInspectorOpen 
       run: () => void clearHistory().then(() => void qc.invalidateQueries({ queryKey: ['history'] })),
     });
 
+    // Commands contributed by the active connection's plugin (if any).
+    const plugin = pickPlugin(pluginConnection?.serverInfo);
+    if (pluginConnection && plugin?.commands) {
+      const groupName = pluginConnection.serverInfo?.name ?? plugin.manifest.name;
+      const ctx = buildPluginContext(pluginConnection);
+      for (const pc of plugin.commands(ctx)) {
+        list.push({ id: pc.id, title: pc.title, group: pc.group ?? groupName, keywords: pc.keywords, run: pc.run });
+      }
+    }
+
     return list;
-  }, [t, cycleTheme, qc, connections, profilesQuery.data, historyQuery.data, view, inspectorOpen, setView, setInspectorOpen]);
+  }, [
+    t,
+    cycleTheme,
+    qc,
+    connections,
+    profilesQuery.data,
+    historyQuery.data,
+    view,
+    inspectorOpen,
+    setView,
+    setInspectorOpen,
+    pluginConnection,
+  ]);
 }
