@@ -32,6 +32,9 @@
     "unpin": "Unpin tab",
     "emptyHint": "No tabs open. Pick a view from the rail or the command palette (Ctrl+K)."
   },
+  "plugins": {
+    "unavailable": "This plugin view isn't available — its connection may have closed."
+  },
   "tools": {
     "title": "Tools",
     "search": "Search tools…",

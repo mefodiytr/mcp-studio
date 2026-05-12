@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "The MCP Studio plugin contract: Plugin / PluginView / PluginContext / manifest.",
   "exports": {
     ".": "./src/index.ts"

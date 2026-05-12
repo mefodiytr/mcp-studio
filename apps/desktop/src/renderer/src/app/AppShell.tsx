@@ -1,10 +1,13 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
 import { useAppCommands } from '@renderer/lib/commands';
-import { useWorkspaceStore, type Tab } from '@renderer/stores/workspace';
+import { useConnections } from '@renderer/lib/connections';
+import { buildPluginContext } from '@renderer/lib/plugin-context';
+import { IN_BOX_PLUGINS, pickPlugin } from '@renderer/plugins/registry';
+import { useWorkspaceStore, type PluginViewRef, type Tab } from '@renderer/stores/workspace';
 
 import { CommandPalette } from './CommandPalette';
 import { LeftRail, type AppView } from './LeftRail';
@@ -34,8 +37,8 @@ const ProtocolInspector = lazy(() =>
   import('@renderer/features/inspector/ProtocolInspector').then((m) => ({ default: m.ProtocolInspector })),
 );
 
-function ViewForTab({ tab }: { tab: Tab }) {
-  switch (tab.view) {
+function BuiltinView({ view }: { view: AppView }) {
+  switch (view) {
     case 'tools':
       return <ToolsCatalog />;
     case 'resources':
@@ -49,6 +52,30 @@ function ViewForTab({ tab }: { tab: Tab }) {
     case 'connections':
       return <ConnectionsView />;
   }
+}
+
+/** Host for a plugin-contributed view — finds the plugin + view + bound
+ *  connection and renders the view's component with a fresh `PluginContext`. */
+function PluginViewHost({ view, connectionId }: { view: PluginViewRef; connectionId?: string }) {
+  const { t } = useTranslation();
+  const connections = useConnections();
+  const connection = connections.find((c) => c.connectionId === connectionId);
+  const ctx = useMemo(() => (connection ? buildPluginContext(connection) : null), [connection]);
+  const pluginView = IN_BOX_PLUGINS.find((p) => p.manifest.name === view.plugin)?.views.find((v) => v.id === view.viewId);
+  if (!ctx || !pluginView) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        {t('plugins.unavailable')}
+      </div>
+    );
+  }
+  const Component = pluginView.component;
+  return <Component ctx={ctx} />;
+}
+
+function ViewForTab({ tab }: { tab: Tab }) {
+  if (typeof tab.view !== 'string') return <PluginViewHost view={tab.view} connectionId={tab.connectionId} />;
+  return <BuiltinView view={tab.view} />;
 }
 
 function LoadingFallback() {
@@ -77,21 +104,32 @@ function WorkspaceEmpty({ onOpen }: { onOpen: (view: AppView) => void }) {
 }
 
 /**
- * The application chrome: a left navigation rail, then a main column made of
- * the tab strip, the active tab's view (or the empty state), an optional
- * protocol-inspector dock, and the status bar. Tab/layout state lives in the
- * Zustand workspace store (persisted to localStorage); server data stays in
- * React Query.
+ * The application chrome: a left navigation rail (built-in items + the active
+ * connection's plugin's view items), then a main column made of the tab strip,
+ * the active tab's view (or the empty state), an optional protocol-inspector
+ * dock, and the status bar. Tab/layout state lives in the Zustand workspace
+ * store (persisted to localStorage); server data stays in React Query.
  */
 export function AppShell() {
   const tabs = useWorkspaceStore((s) => s.tabs);
   const activeTabId = useWorkspaceStore((s) => s.activeTabId);
   const focusOrOpen = useWorkspaceStore((s) => s.focusOrOpen);
+  const connections = useConnections();
+
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
-  const activeView = activeTab?.view ?? null;
+  const activeBuiltinView = activeTab && typeof activeTab.view === 'string' ? activeTab.view : null;
+  const activePluginViewId = activeTab && typeof activeTab.view === 'object' ? activeTab.view.viewId : null;
+
+  // Rail plugin items come from the first connected connection that a plugin
+  // specializes. (Disambiguating multiple matching connections is a follow-up.)
+  const pluginConnection = useMemo(
+    () => connections.find((c) => c.status === 'connected' && pickPlugin(c.serverInfo) !== undefined),
+    [connections],
+  );
+  const activePlugin = pluginConnection ? pickPlugin(pluginConnection.serverInfo) : undefined;
 
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const commands = useAppCommands({ view: activeView, setView: focusOrOpen, inspectorOpen, setInspectorOpen });
+  const commands = useAppCommands({ view: activeBuiltinView, setView: focusOrOpen, inspectorOpen, setInspectorOpen });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -108,8 +146,15 @@ export function AppShell() {
     <div className="flex h-full w-full bg-background text-foreground">
       <CommandPalette commands={commands} />
       <LeftRail
-        view={activeView}
+        view={activeBuiltinView}
         onSelect={focusOrOpen}
+        pluginViews={activePlugin?.views ?? []}
+        activePluginViewId={activePluginViewId}
+        onOpenPluginView={(viewId) => {
+          if (activePlugin && pluginConnection) {
+            focusOrOpen({ plugin: activePlugin.manifest.name, viewId }, pluginConnection.connectionId);
+          }
+        }}
         inspectorOpen={inspectorOpen}
         onToggleInspector={() => setInspectorOpen((open) => !open)}
       />

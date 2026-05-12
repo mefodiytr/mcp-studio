@@ -6,12 +6,15 @@ import {
   MessageSquare,
   Monitor,
   Moon,
+  Puzzle,
   Server,
   Settings,
   Sun,
   Wrench,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+import type { PluginView } from '@mcp-studio/plugin-api';
 
 import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
@@ -33,11 +36,18 @@ const THEME_ICON: Record<Theme, typeof Sun> = { light: Sun, dark: Moon, system: 
 export function LeftRail({
   view,
   onSelect,
+  pluginViews,
+  activePluginViewId,
+  onOpenPluginView,
   inspectorOpen,
   onToggleInspector,
 }: {
   view: AppView | null;
   onSelect: (view: AppView) => void;
+  /** View items contributed by the active connection's plugin (empty if none). */
+  pluginViews: PluginView[];
+  activePluginViewId: string | null;
+  onOpenPluginView: (viewId: string) => void;
   inspectorOpen: boolean;
   onToggleInspector: () => void;
 }) {
@@ -68,6 +78,30 @@ export function LeftRail({
           </Button>
         );
       })}
+
+      {pluginViews.length > 0 && (
+        <>
+          <div className="my-0.5 h-px w-6 bg-sidebar-border" aria-hidden />
+          {pluginViews.map((pv) => {
+            const Icon = pv.icon ?? Puzzle;
+            const active = pv.id === activePluginViewId;
+            return (
+              <Button
+                key={pv.id}
+                variant="ghost"
+                size="icon"
+                title={pv.title}
+                aria-label={pv.title}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => onOpenPluginView(pv.id)}
+                className={cn(active && 'bg-sidebar-accent text-sidebar-accent-foreground')}
+              >
+                <Icon className="size-4" />
+              </Button>
+            );
+          })}
+        </>
+      )}
 
       <Button
         variant="ghost"

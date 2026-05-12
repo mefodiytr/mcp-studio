@@ -6,12 +6,30 @@ import type { AppView } from '@renderer/app/LeftRail';
 let counter = 0;
 const newId = (): string => `tab-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
+/** A plugin-contributed view, identified by the plugin name + the view id. */
+export interface PluginViewRef {
+  plugin: string;
+  viewId: string;
+}
+
+/** What a tab shows: a built-in `AppView`, or a plugin view (which is bound to
+ *  a connection — `Tab.connectionId` is then required). */
+export type TabView = AppView | PluginViewRef;
+
+function isPluginView(view: TabView): view is PluginViewRef {
+  return typeof view === 'object';
+}
+function sameView(a: TabView, b: TabView): boolean {
+  if (typeof a === 'string' || typeof b === 'string') return a === b;
+  return a.plugin === b.plugin && a.viewId === b.viewId;
+}
+
 /** One tab in the workspace = an instance of a view, optionally bound to a
- *  specific connection (the binding is forward-looking; in M1 each view-tab
- *  still carries its own connection picker, so `connectionId` is unused). */
+ *  connection. Built-in views (`view: string`) carry their own connection
+ *  picker so `connectionId` is unused; a plugin view is always connection-bound. */
 export interface Tab {
   id: string;
-  view: AppView;
+  view: TabView;
   connectionId?: string;
   pinned: boolean;
 }
@@ -20,9 +38,9 @@ interface WorkspaceState {
   tabs: Tab[];
   activeTabId: string | null;
   /** Append a new tab and (unless `activate: false`) focus it. */
-  openTab: (view: AppView, opts?: { connectionId?: string; activate?: boolean }) => string;
-  /** Focus an existing plain tab for `view`, or open one if there isn't one. */
-  focusOrOpen: (view: AppView) => void;
+  openTab: (view: TabView, opts?: { connectionId?: string; activate?: boolean }) => string;
+  /** Focus an existing tab for `view` (+ `connectionId`), or open one. */
+  focusOrOpen: (view: TabView, connectionId?: string) => void;
   closeTab: (id: string) => void;
   activateTab: (id: string) => void;
   moveTab: (id: string, toIndex: number) => void;
@@ -42,10 +60,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }));
         return tab.id;
       },
-      focusOrOpen: (view) => {
-        const existing = get().tabs.find((t) => t.view === view && t.connectionId === undefined);
+      focusOrOpen: (view, connectionId) => {
+        const existing = get().tabs.find((t) => sameView(t.view, view) && t.connectionId === connectionId);
         if (existing) set({ activeTabId: existing.id });
-        else get().openTab(view);
+        else get().openTab(view, { connectionId });
       },
       closeTab: (id) =>
         set((state) => {
@@ -72,12 +90,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }),
     {
       name: 'mcp-studio.workspace',
-      // Connections don't survive a restart, so a persisted `connectionId` would
-      // be stale — drop it (and any other transient field) on the way out.
-      partialize: (state) => ({
-        tabs: state.tabs.map(({ id, view, pinned }) => ({ id, view, pinned })),
-        activeTabId: state.activeTabId,
-      }),
+      // Plugin tabs are inherently ephemeral (bound to a live connection, which
+      // doesn't survive a restart) — persist only the built-in ones, and keep
+      // `activeTabId` valid against what's left.
+      partialize: (state) => {
+        const tabs = state.tabs
+          .filter((t): t is Tab & { view: AppView } => !isPluginView(t.view))
+          .map(({ id, view, pinned }) => ({ id, view, pinned }));
+        const activeStillThere = tabs.some((t) => t.id === state.activeTabId);
+        return { tabs, activeTabId: activeStillThere ? state.activeTabId : (tabs[0]?.id ?? null) };
+      },
     },
   ),
 );

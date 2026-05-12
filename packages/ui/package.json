@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Vendored shadcn/ui components (new-york) + cn — shared by the desktop app and in-box plugins.",
   "exports": {
     ".": "./src/index.ts"

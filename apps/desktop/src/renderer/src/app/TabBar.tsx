@@ -4,7 +4,15 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@renderer/components/ui/button';
 import { cn } from '@renderer/lib/utils';
-import { useWorkspaceStore, type Tab } from '@renderer/stores/workspace';
+import { IN_BOX_PLUGINS } from '@renderer/plugins/registry';
+import { useWorkspaceStore, type Tab, type TabView } from '@renderer/stores/workspace';
+
+function pluginViewTitle(view: { plugin: string; viewId: string }): string {
+  return (
+    IN_BOX_PLUGINS.find((p) => p.manifest.name === view.plugin)?.views.find((v) => v.id === view.viewId)?.title ??
+    view.viewId
+  );
+}
 
 export function TabBar() {
   const { t } = useTranslation();
@@ -18,35 +26,39 @@ export function TabBar() {
 
   const dragId = useRef<string | null>(null);
 
-  const activeView = tabs.find((tt) => tt.id === activeTabId)?.view ?? 'connections';
+  const activeTab = tabs.find((tt) => tt.id === activeTabId);
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 overflow-x-auto border-b bg-background px-2">
-      {tabs.map((tab, index) => (
-        <TabChip
-          key={tab.id}
-          tab={tab}
-          label={t(`tabs.${tab.view}`)}
-          active={tab.id === activeTabId}
-          onActivate={() => activateTab(tab.id)}
-          onClose={() => closeTab(tab.id)}
-          onTogglePin={() => togglePin(tab.id)}
-          closeTitle={t('tabs.close')}
-          pinTitle={tab.pinned ? t('tabs.unpin') : t('tabs.pin')}
-          onDragStart={() => (dragId.current = tab.id)}
-          onDrop={() => {
-            if (dragId.current && dragId.current !== tab.id) moveTab(dragId.current, index);
-            dragId.current = null;
-          }}
-        />
-      ))}
+      {tabs.map((tab, index) => {
+        const view: TabView = tab.view;
+        const label = typeof view === 'string' ? t(`tabs.${view}`) : pluginViewTitle(view);
+        return (
+          <TabChip
+            key={tab.id}
+            tab={tab}
+            label={label}
+            active={tab.id === activeTabId}
+            onActivate={() => activateTab(tab.id)}
+            onClose={() => closeTab(tab.id)}
+            onTogglePin={() => togglePin(tab.id)}
+            closeTitle={t('tabs.close')}
+            pinTitle={tab.pinned ? t('tabs.unpin') : t('tabs.pin')}
+            onDragStart={() => (dragId.current = tab.id)}
+            onDrop={() => {
+              if (dragId.current && dragId.current !== tab.id) moveTab(dragId.current, index);
+              dragId.current = null;
+            }}
+          />
+        );
+      })}
       <Button
         variant="ghost"
         size="icon"
         className="size-7 shrink-0"
         title={t('tabs.newTab')}
         aria-label={t('tabs.newTab')}
-        onClick={() => openTab(activeView)}
+        onClick={() => openTab(activeTab?.view ?? 'connections', { connectionId: activeTab?.connectionId })}
       >
         <Plus />
       </Button>
