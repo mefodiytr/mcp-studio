@@ -2,11 +2,27 @@ import { useEffect, useState } from 'react';
 
 import type { ConnectionSummary } from '@shared/domain/connection';
 
-/** The live connections, kept in sync via the `connections:changed` event.
- *  Connections do not survive a process restart, so this starts empty. */
+/** The live connections: seeded from `connections:list` on mount, then kept in
+ *  sync via the `connections:changed` event. Seeding matters for components
+ *  mounted *after* a connection was made (a lazily-loaded view, a plugin view
+ *  opened later) — they'd otherwise stay empty until the next change event. */
 export function useConnections(): ConnectionSummary[] {
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
-  useEffect(() => window.studio?.on('connections:changed', (event) => setConnections(event.connections)), []);
+  useEffect(() => {
+    let gotEvent = false;
+    void window.studio
+      ?.invoke('connections:list', {})
+      .then((list) => {
+        if (!gotEvent) setConnections(list);
+      })
+      .catch(() => {
+        /* bridge unavailable — events (if any) will populate it */
+      });
+    return window.studio?.on('connections:changed', (event) => {
+      gotEvent = true;
+      setConnections(event.connections);
+    });
+  }, []);
   return connections;
 }
 
