@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, FileInput, Folder, FolderOpen } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import type { PluginContext } from '@mcp-studio/plugin-api';
 import { cn } from '@mcp-studio/ui';
 
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { componentIcon } from '../lib/component-icon';
 import { listChildren, type NiagaraNode } from '../lib/niagara-api';
 import { ROOT_ORD } from '../lib/ord';
 import { useExplorerStore } from '../state/explorer-store';
@@ -133,7 +134,6 @@ function TreeNode({
 }
 
 function NodeIcon({ node, expanded }: { node: NiagaraNode; expanded: boolean }) {
-  // Type-aware icons land in C45; for now folder vs. point.
-  const Icon = node.isPoint ? FileInput : expanded ? FolderOpen : Folder;
+  const Icon = componentIcon({ type: node.type, isPoint: node.isPoint, expanded });
   return <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />;
 }

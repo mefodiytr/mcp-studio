@@ -132,6 +132,13 @@ affect MCP Studio's behaviour against it.
   The C44 BQL playground papers over both client-side (prepend a default ORD
   prefix; surface `limit` as a dedicated control, never let it into the query
   text), but they're server-side warts. *(niagaramcp work.)*
+- **Tool descriptions are partly Russian.** Several niagaramcp tools
+  (`bqlQuery`, `listChildren`, `readPoint`, `writePoint`, …) ship Russian-only
+  `description` text in their inputSchemas; `getSlots`/`findComponentsByType`/`findPoints`
+  have no per-parameter descriptions. Should be English (or properly localized).
+  The Niagara plugin's `toolSchemaHints` (C45) overlays English `title` /
+  `description` / `examples` for the tools it cares about, but that only covers a
+  subset and only in Studio. *(niagaramcp work.)*
 - **`rotateMcpToken` coordination** — see `docs/milestone-2.md` D5: the
   BearerResolver / user-Bearer write-auth flow (the `mcp:tokenHash` Tag) is **M3**,
   designed there alongside niagaramcp's token-rotation tool.

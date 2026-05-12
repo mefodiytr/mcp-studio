@@ -35,12 +35,38 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+/** Overlay a plugin's tool-schema hint onto a tool's `inputSchema`: top-level
+ *  keys win, `properties` are merged per-key (hint wins per key), `required` is
+ *  unioned. Returns the original schema untouched when there's no hint. */
+function mergeSchemaHint(schema: unknown, hint: Record<string, unknown> | undefined): unknown {
+  if (!hint || Object.keys(hint).length === 0) return schema;
+  const base = asRecord(schema);
+  const props = { ...asRecord(base['properties']) };
+  for (const [key, hintProp] of Object.entries(asRecord(hint['properties']))) {
+    const baseProp = props[key];
+    props[key] =
+      baseProp && typeof baseProp === 'object' && hintProp && typeof hintProp === 'object'
+        ? { ...asRecord(baseProp), ...asRecord(hintProp) }
+        : hintProp;
+  }
+  const required = Array.from(
+    new Set([
+      ...(Array.isArray(base['required']) ? (base['required'] as unknown[]) : []),
+      ...(Array.isArray(hint['required']) ? (hint['required'] as unknown[]) : []),
+    ]),
+  );
+  const merged: Record<string, unknown> = { ...base, ...hint, properties: props };
+  if (required.length > 0) merged['required'] = required;
+  return merged;
+}
+
 export function ToolInvocationDialog({
   connectionId,
   tool,
   open,
   onOpenChange,
   initialArgs,
+  schemaHint,
 }: {
   connectionId: string;
   tool: ToolDescriptor;
@@ -48,6 +74,9 @@ export function ToolInvocationDialog({
   onOpenChange: (open: boolean) => void;
   /** Pre-fill the args form (e.g. "edit & re-run" from history). */
   initialArgs?: Record<string, unknown>;
+  /** A plugin's schema overlay for this tool (English text / examples), merged
+   *  onto `tool.inputSchema` for the args form. */
+  schemaHint?: Record<string, unknown>;
 }) {
   const { t } = useTranslation();
   const history = useHistory();
@@ -175,7 +204,7 @@ export function ToolInvocationDialog({
             )}
             <SchemaForm
               key={formKey}
-              schema={tool.inputSchema}
+              schema={mergeSchemaHint(tool.inputSchema, schemaHint)}
               initialValue={recalled ?? initialArgs}
               onSubmit={onSubmit}
               submitLabel={calling ? '…' : t('tools.call')}

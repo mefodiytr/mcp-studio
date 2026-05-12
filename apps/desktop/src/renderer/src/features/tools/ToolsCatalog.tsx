@@ -8,6 +8,7 @@ import { useConnections } from '@renderer/lib/connections';
 import { useHistory } from '@renderer/lib/history';
 import { useTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
+import { pickPlugin } from '@renderer/plugins/registry';
 import type { ToolDescriptor } from '@shared/domain/connection';
 
 import { ToolInvocationDialog } from './ToolInvocationDialog';
@@ -20,8 +21,14 @@ export function ToolsCatalog() {
   const connections = useConnections();
   const connected = connections.filter((c) => c.status === 'connected');
   const [picked, setPicked] = useState<string | undefined>(undefined);
-  const activeId = picked && connected.some((c) => c.connectionId === picked) ? picked : connected[0]?.connectionId;
+  const activeConn = (picked ? connected.find((c) => c.connectionId === picked) : undefined) ?? connected[0];
+  const activeId = activeConn?.connectionId;
   const toolsQuery = useTools(activeId);
+  const plugin = pickPlugin(activeConn?.serverInfo);
+  const hintFor = (name: string): Record<string, unknown> | undefined => {
+    const hint = plugin?.toolSchemaHints?.[name];
+    return hint && typeof hint === 'object' && !Array.isArray(hint) ? (hint as Record<string, unknown>) : undefined;
+  };
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<ReadonlySet<AnnotationFilter>>(new Set());
@@ -131,6 +138,7 @@ export function ToolsCatalog() {
         <ToolInvocationDialog
           connectionId={activeId}
           tool={invoking}
+          schemaHint={hintFor(invoking.name)}
           open
           onOpenChange={(o) => {
             if (!o) setInvoking(null);

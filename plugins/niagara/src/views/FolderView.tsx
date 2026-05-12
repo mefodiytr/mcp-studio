@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, FileInput, Folder } from 'lucide-react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { cn } from '@mcp-studio/ui';
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
 import { Breadcrumbs } from '../components/Breadcrumbs';
+import { componentIcon } from '../lib/component-icon';
 import { listChildren, type NiagaraNode } from '../lib/niagara-api';
 import { ordLeaf, ROOT_ORD, slotPath } from '../lib/ord';
 import { sortNodes, type SortDir, type SortKey } from '../lib/sort';
@@ -74,7 +75,7 @@ export function FolderView({ ctx }: { ctx: PluginContext }) {
             <tbody>
               {rows.map((node) => {
                 const isSelected = selected === node.ord;
-                const Icon = node.isPoint ? FileInput : Folder;
+                const Icon = componentIcon({ type: node.type, isPoint: node.isPoint });
                 return (
                   <tr
                     key={node.ord}
