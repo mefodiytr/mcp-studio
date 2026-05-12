@@ -7,6 +7,7 @@ import { useAppCommands } from '@renderer/lib/commands';
 import { useConnections } from '@renderer/lib/connections';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
 import { IN_BOX_PLUGINS, pickPlugin } from '@renderer/plugins/registry';
+import { useTemplatingStore } from '@renderer/stores/templating';
 import { useWorkspaceStore, type PluginViewRef, type Tab } from '@renderer/stores/workspace';
 
 import { CommandPalette } from './CommandPalette';
@@ -59,8 +60,9 @@ function BuiltinView({ view }: { view: AppView }) {
 function PluginViewHost({ view, connectionId }: { view: PluginViewRef; connectionId?: string }) {
   const { t } = useTranslation();
   const connections = useConnections();
+  const setCwd = useTemplatingStore((s) => s.setCwd);
   const connection = connections.find((c) => c.connectionId === connectionId);
-  const ctx = useMemo(() => (connection ? buildPluginContext(connection) : null), [connection]);
+  const ctx = useMemo(() => (connection ? buildPluginContext(connection, setCwd) : null), [connection, setCwd]);
   const pluginView = IN_BOX_PLUGINS.find((p) => p.manifest.name === view.plugin)?.views.find((v) => v.id === view.viewId);
   if (!ctx || !pluginView) {
     return (

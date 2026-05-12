@@ -3,16 +3,18 @@
  * is expanded before the call:
  *   {{now}}             — current ISO timestamp
  *   {{uuid}}            — a fresh random uuid
+ *   {{cwd}}             — the active plugin view's "current directory" (e.g. the
+ *                         Niagara explorer's selected ORD); empty if none
  *   {{lastResult}}      — the most recent successful tool result
  *   {{lastResult.a.b}}  — a dotted path into it
  *   {{prompt:Label}}    — asks the user (rejects if cancelled)
  * A lone-token string resolves to the token's value (which may be non-string);
  * otherwise tokens are interpolated into the surrounding text.
- *
- * ({{cwd}} is reserved for the Niagara plugin's station-explorer cwd — M2.)
  */
 export interface TemplateContext {
   lastResult?: unknown;
+  /** The active plugin view's "cwd" (published via PluginContext.setCwd). */
+  cwd?: string;
   promptFor: (label: string) => Promise<string>;
 }
 
@@ -37,6 +39,7 @@ async function resolveToken(expr: string, ctx: TemplateContext): Promise<unknown
   const trimmed = expr.trim();
   if (trimmed === 'now') return new Date().toISOString();
   if (trimmed === 'uuid') return crypto.randomUUID();
+  if (trimmed === 'cwd') return ctx.cwd ?? '';
   if (trimmed.startsWith('prompt:')) return ctx.promptFor(trimmed.slice('prompt:'.length).trim());
   if (trimmed === 'lastResult') return ctx.lastResult;
   if (trimmed.startsWith('lastResult.')) return navigate(ctx.lastResult, trimmed.slice('lastResult.'.length));

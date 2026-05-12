@@ -15,6 +15,7 @@ import { describeError } from '@renderer/lib/errors';
 import { useHistory } from '@renderer/lib/history';
 import { expandTemplates } from '@renderer/lib/templating';
 import { callTool } from '@renderer/lib/tools';
+import { useTemplatingStore } from '@renderer/stores/templating';
 import type { ToolDescriptor } from '@shared/domain/connection';
 import type { CallToolResult, ContentBlock, ToolCallError } from '@shared/domain/tool-result';
 
@@ -52,6 +53,7 @@ export function ToolInvocationDialog({
   const history = useHistory();
   const lastResult = history.data?.find((entry) => entry.result != null)?.result;
   const lastEntry = history.data?.find((entry) => entry.toolName === tool.name);
+  const cwd = useTemplatingStore((s) => s.cwd);
 
   const [calling, setCalling] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -71,7 +73,7 @@ export function ToolInvocationDialog({
     try {
       const promptFor = (label: string): Promise<string> =>
         new Promise<string>((resolve, reject) => setPrompt({ label, resolve, reject }));
-      args = asRecord(await expandTemplates(rawArgs, { lastResult, promptFor }));
+      args = asRecord(await expandTemplates(rawArgs, { lastResult, cwd, promptFor }));
     } catch {
       setCalling(false); // prompt cancelled
       return;
