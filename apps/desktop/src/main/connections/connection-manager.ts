@@ -141,7 +141,14 @@ export class ConnectionManager {
             },
           });
           this.emitChanged();
-          this.openExternal(url.toString());
+          if (process.env['MCPSTUDIO_OAUTH_AUTOAPPROVE']) {
+            // Test hook: auto-approve by following the authorization URL — the
+            // test auth server 302s straight to our loopback /callback?code=…,
+            // so no browser is opened. (No effect in normal use.)
+            void fetch(url.toString(), { redirect: 'follow' }).catch(() => undefined);
+          } else {
+            this.openExternal(url.toString());
+          }
         },
       },
     );

@@ -12,10 +12,12 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/index.ts'], // re-exports only
       // A regression floor that ratchets up as tests accrue (master-spec §13).
-      // `Connection`'s happy path is the integration test here (+ the Playwright
-      // e2e); `oauth.ts` is unit-tested; the HTTP/SSE transports and the
-      // error/disconnect paths still want dedicated tests — raise again then.
-      thresholds: { lines: 75, functions: 60, statements: 75, branches: 75 },
+      // `Connection`'s happy path is the integration test here; `oauth.ts` is
+      // unit-tested; the OAuth-error paths in connection.ts are exercised by the
+      // Playwright e2e (not by mcp-client unit coverage), so `functions` stays
+      // at 60. The HTTP/SSE transports + the disconnect paths still want
+      // dedicated unit tests — raise the rest again then.
+      thresholds: { lines: 78, functions: 60, statements: 78, branches: 80 },
     },
   },
 });
