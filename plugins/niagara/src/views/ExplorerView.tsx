@@ -7,6 +7,7 @@ import { cn } from '@mcp-studio/ui';
 import { listChildren, type NiagaraNode } from '../lib/niagara-api';
 import { ordTrail, ROOT_ORD } from '../lib/ord';
 import { useExplorerStore } from '../state/explorer-store';
+import { QuickNav } from './QuickNav';
 
 const INDENT_PX = 14;
 
@@ -32,6 +33,7 @@ export function ExplorerView({ ctx }: { ctx: PluginContext }) {
       <div role="tree" className="min-h-0 flex-1 overflow-auto py-1 text-sm">
         <NodeChildren ctx={ctx} parentOrd={ROOT_ORD} depth={0} onSelect={(ord) => { select(ord); ctx.setCwd(ord); }} />
       </div>
+      <QuickNav ctx={ctx} />
     </div>
   );
 }
