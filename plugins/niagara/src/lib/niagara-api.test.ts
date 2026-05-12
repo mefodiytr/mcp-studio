@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
-import { listChildren, payload, textContent } from './niagara-api';
+import { getSlots, inspectComponent, listChildren, payload, textContent } from './niagara-api';
 
 describe('payload', () => {
   it('prefers structuredContent', () => {
@@ -66,5 +66,53 @@ describe('listChildren', () => {
   it('returns [] when the result has no children', async () => {
     expect(await listChildren(fakeCtx(async () => ({ structuredContent: { ord: 'x' } })), 'x')).toEqual([]);
     expect(await listChildren(fakeCtx(async () => ({})), 'x')).toEqual([]);
+  });
+});
+
+describe('inspectComponent', () => {
+  it('reads identity + childCount, coercing the bare parentOrd', async () => {
+    const ctx = fakeCtx(async () => ({
+      structuredContent: { ord: 'station:|slot:/Drivers', parentOrd: 'slot:/', displayName: 'Drivers', name: 'Drivers', childCount: 13, type: 'driver:DriverContainer' },
+    }));
+    expect(await inspectComponent(ctx, 'station:|slot:/Drivers')).toEqual({
+      ord: 'station:|slot:/Drivers',
+      name: 'Drivers',
+      displayName: 'Drivers',
+      type: 'driver:DriverContainer',
+      parentOrd: 'station:|slot:/',
+      childCount: 13,
+    });
+  });
+
+  it('falls back: derives name from the ord and parentOrd from the path', async () => {
+    const info = await inspectComponent(fakeCtx(async () => ({ structuredContent: {} })), 'station:|slot:/Services/UserService');
+    expect(info).toMatchObject({ ord: 'station:|slot:/Services/UserService', name: 'UserService', displayName: 'UserService', parentOrd: 'station:|slot:/Services', childCount: 0, type: '' });
+  });
+});
+
+describe('getSlots', () => {
+  it('maps slot rows (name/type/value, optional facets)', async () => {
+    const ctx = fakeCtx(async (name, args) => {
+      expect(name).toBe('getSlots');
+      expect(args).toEqual({ ord: 'station:|slot:/Services/UserService' });
+      return {
+        structuredContent: {
+          slots: [
+            { name: 'lockOutEnabled', type: 'baja:Boolean', value: 'поистине' },
+            { name: 'out', type: 'baja:StatusNumeric', value: '21.5 {ok}', facets: { units: '°C', precision: 1 } },
+          ],
+        },
+        content: [{ type: 'text', text: '{}' }],
+      };
+    });
+    const slots = await getSlots(ctx, 'station:|slot:/Services/UserService');
+    expect(slots).toEqual([
+      { name: 'lockOutEnabled', type: 'baja:Boolean', value: 'поистине', facets: undefined },
+      { name: 'out', type: 'baja:StatusNumeric', value: '21.5 {ok}', facets: { units: '°C', precision: 1 } },
+    ]);
+  });
+
+  it('returns [] when there is no slots array', async () => {
+    expect(await getSlots(fakeCtx(async () => ({ structuredContent: { ord: 'x' } })), 'x')).toEqual([]);
   });
 });

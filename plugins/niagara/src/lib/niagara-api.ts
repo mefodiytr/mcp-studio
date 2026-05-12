@@ -7,7 +7,7 @@
  */
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
-import { ordLeaf } from './ord';
+import { fullOrd, ordLeaf, parentOrd } from './ord';
 
 /** A node in the station's slot hierarchy, as returned by `listChildren`. */
 export interface NiagaraNode {
@@ -63,6 +63,9 @@ function str(value: unknown, fallback = ''): string {
 function bool(value: unknown): boolean {
   return value === true;
 }
+function num(value: unknown, fallback = 0): number {
+  return typeof value === 'number' ? value : fallback;
+}
 
 function toNode(raw: unknown): NiagaraNode {
   const r = asObject(raw);
@@ -77,4 +80,58 @@ export async function listChildren(ctx: PluginContext, ord: string, depth = 1): 
   const result = await ctx.callTool('listChildren', depth > 1 ? { ord, depth } : { ord });
   const children = payload(result)['children'];
   return Array.isArray(children) ? children.map(toNode) : [];
+}
+
+/** Identity + child count of a single component (`inspectComponent` is *not* a
+ *  slot dump — use {@link getSlots} for that). */
+export interface ComponentInfo {
+  ord: string;
+  name: string;
+  displayName: string;
+  type: string;
+  /** Parent component ORD; `null` at the station root. */
+  parentOrd: string | null;
+  childCount: number;
+}
+
+export async function inspectComponent(ctx: PluginContext, ord: string): Promise<ComponentInfo> {
+  const p = payload(await ctx.callTool('inspectComponent', { ord }));
+  const resolvedOrd = str(p['ord']) || ord;
+  const name = str(p['name']) || ordLeaf(resolvedOrd);
+  const rawParent = str(p['parentOrd']);
+  return {
+    ord: resolvedOrd,
+    name,
+    displayName: str(p['displayName']) || name,
+    type: str(p['type']),
+    parentOrd: rawParent ? fullOrd(rawParent) : parentOrd(resolvedOrd),
+    childCount: num(p['childCount']),
+  };
+}
+
+/** One property slot of a component (`getSlots`). */
+export interface SlotRow {
+  name: string;
+  /** Niagara slot type, e.g. `baja:Boolean`, `baja:RelTime`. */
+  type: string;
+  /** Current value as the station stringifies it (may be display-localized,
+   *  e.g. `"поистине"` for `true`). */
+  value: string;
+  /** Selected facets (units, precision, …) when the server includes them. */
+  facets?: Record<string, unknown>;
+}
+
+export async function getSlots(ctx: PluginContext, ord: string): Promise<SlotRow[]> {
+  const slots = payload(await ctx.callTool('getSlots', { ord }))['slots'];
+  if (!Array.isArray(slots)) return [];
+  return slots.map((raw) => {
+    const r = asObject(raw);
+    const facets = r['facets'];
+    return {
+      name: str(r['name']),
+      type: str(r['type']),
+      value: str(r['value']),
+      facets: facets && typeof facets === 'object' && !Array.isArray(facets) ? (facets as Record<string, unknown>) : undefined,
+    };
+  });
 }
