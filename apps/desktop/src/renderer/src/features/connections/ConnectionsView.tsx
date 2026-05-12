@@ -23,6 +23,15 @@ function oauthStatusKey(status: OAuthStatus): string {
   return 'connections.signedIn';
 }
 
+function formatDurationUntil(epochMs: number): string {
+  const secs = Math.max(0, Math.round((epochMs - Date.now()) / 1000));
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ${mins % 60}m`;
+}
+
 const DEV_PROFILE: ProfileInput = {
   transport: 'stdio',
   command: 'mcp-server-everything',
@@ -313,6 +322,14 @@ function ConnectionCard({ connection, profileName }: { connection: ConnectionSum
               {connection.sessionId && (
                 <p className="text-xs text-muted-foreground">
                   {t('connections.sessionId')}: <span className="font-mono">{connection.sessionId}</span>
+                </p>
+              )}
+              {connection.oauthExpiresAt != null && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <KeyRound className="size-3" aria-hidden />
+                  {connection.oauthExpiresAt <= Date.now()
+                    ? t('connections.tokenExpired')
+                    : t('connections.expiresIn', { duration: formatDurationUntil(connection.oauthExpiresAt) })}
                 </p>
               )}
             </>

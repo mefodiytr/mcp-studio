@@ -157,6 +157,7 @@
     "signedIn": "signed in",
     "signInRequired": "sign-in required",
     "tokenExpired": "token expired",
+    "expiresIn": "expires in {{duration}}",
     "sessionExpired": "{{name}} — session expired, sign in again",
     "sessionExpiredShort": "Session expired — sign in again",
     "tlsInsecureBadge": "TLS-insecure",

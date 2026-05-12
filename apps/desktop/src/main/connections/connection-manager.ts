@@ -22,6 +22,7 @@ import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import type { ToolHistoryRepository } from '../store/tool-history-repository';
 import { startLoopbackRedirect, type LoopbackRedirect } from '../oauth/redirect';
+import { tokenExpiresAt } from '../oauth/status';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
 import type { ProtocolTap } from './protocol-tap';
 
@@ -135,6 +136,7 @@ export class ConnectionManager {
               latencyMs: null,
               latencyHistory: [],
               sessionId: null,
+              oauthExpiresAt: null,
               error: null,
             },
           });
@@ -180,7 +182,12 @@ export class ConnectionManager {
       }
     }
     redirect.close(); // idempotent — a successful callback already tore it down
-    return this.finalizeConnection(connectionId, profile.id, connection);
+    return this.finalizeConnection(
+      connectionId,
+      profile.id,
+      connection,
+      tokenExpiresAt(this.vault.getOAuthArtifacts(profile.id)),
+    );
   }
 
   /** Probe a freshly-connected session, register it, and emit. Replaces any
@@ -189,6 +196,7 @@ export class ConnectionManager {
     connectionId: string,
     profileId: string,
     connection: Connection,
+    oauthExpiresAt: number | null = null,
   ): Promise<ConnectionSummary> {
     const caps = connection.capabilities;
     const counts = {
@@ -212,6 +220,7 @@ export class ConnectionManager {
       latencyMs,
       latencyHistory: latencyMs != null ? [latencyMs] : [],
       sessionId: connection.sessionId ?? null,
+      oauthExpiresAt,
       error: null,
     };
 
@@ -391,7 +400,11 @@ export class ConnectionManager {
         try {
           const latencyMs = await managed.connection.ping();
           const latencyHistory = [...managed.summary.latencyHistory, latencyMs].slice(-LATENCY_HISTORY_CAP);
-          managed.summary = { ...managed.summary, latencyMs, latencyHistory };
+          // The SDK refreshes the access token transparently on a 401 (the ping
+          // above triggers it once the token expires) and updates the vault —
+          // re-read it so the displayed expiry tracks reality.
+          const oauthExpiresAt = tokenExpiresAt(this.vault.getOAuthArtifacts(managed.profileId));
+          managed.summary = { ...managed.summary, latencyMs, latencyHistory, oauthExpiresAt };
           changed = true;
         } catch (cause) {
           this.markErrored(managed.connectionId, cause instanceof Error ? cause.message : 'Ping failed');

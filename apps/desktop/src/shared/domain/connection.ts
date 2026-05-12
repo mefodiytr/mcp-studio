@@ -17,7 +17,10 @@ export const connectionSummarySchema = z.object({
   latencyHistory: z.array(z.number()),
   /** Streamable-HTTP session id (`Mcp-Session-Id`); null for stdio/sse. */
   sessionId: z.string().nullable(),
-  /** Set when status is "error" — the reason the session dropped. */
+  /** For OAuth connections: epoch ms the access token expires (null if not an
+   *  OAuth connection, or the token carried no `expires_in`). */
+  oauthExpiresAt: z.number().nullable(),
+  /** Set when status is "error" / "auth-required" — the reason the session dropped. */
   error: z.string().nullable(),
 });
 export type ConnectionSummary = z.infer<typeof connectionSummarySchema>;
