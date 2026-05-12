@@ -25,9 +25,11 @@ export default defineConfig({
         ...sharedAlias,
         '@renderer': resolve('src/renderer/src'),
       },
-      // Single React instance even though workspace packages (schema-form) bring
-      // their own react-hook-form etc.
-      dedupe: ['react', 'react-dom'],
+      // One instance of the context-bearing libraries across the host bundle
+      // and the lazily-chunked in-box plugin views (which import React / React
+      // Query via peerDeps) — a duplicate copy means broken hooks or "No
+      // QueryClient set". (schema-form similarly brings react-hook-form etc.)
+      dedupe: ['react', 'react-dom', 'react/jsx-runtime', '@tanstack/react-query'],
     },
     plugins: [react(), tailwindcss()],
   },
