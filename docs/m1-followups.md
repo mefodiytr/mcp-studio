@@ -96,3 +96,20 @@ covers discovery → DCR → authorize → token exchange → connect → invoke
 - **`mcp-client` transport coverage.** The HTTP/SSE transports and the
   disconnect/error paths still want dedicated unit tests; raise the `mcp-client`
   coverage floor (currently 78/60/78/80) when they land.
+
+## niagaramcp-side coordination (other repo — track here, fix there)
+
+Changes needed on **niagaramcp**, not in this repo. Tracked here because they
+affect MCP Studio's behaviour against it.
+
+- **Write-tool annotations.** niagaramcp's write / walkthrough tools should carry
+  honest MCP tool annotations so Studio's safety UI works: `readOnlyHint: false`
+  on all of them, and `destructiveHint: true` on the create/update tools —
+  especially `bulkCreateEquipment` (and the other bulk ops). Studio's
+  `ToolInvocationDialog` gates a confirm step on `annotations.destructiveHint`; if
+  niagaramcp doesn't set it, the generic Tools-catalog path runs those tools with
+  no warning. Relevant to **M3** (write & safety) — the Niagara write workflow
+  will lean on these. *(niagaramcp work — not now.)*
+- **`rotateMcpToken` coordination** — see `docs/milestone-2.md` D5: the
+  BearerResolver / user-Bearer write-auth flow (the `mcp:tokenHash` Tag) is **M3**,
+  designed there alongside niagaramcp's token-rotation tool.
