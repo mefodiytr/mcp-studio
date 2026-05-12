@@ -102,14 +102,26 @@ covers discovery → DCR → authorize → token exchange → connect → invoke
 Changes needed on **niagaramcp**, not in this repo. Tracked here because they
 affect MCP Studio's behaviour against it.
 
-- **Write-tool annotations.** niagaramcp's write / walkthrough tools should carry
-  honest MCP tool annotations so Studio's safety UI works: `readOnlyHint: false`
-  on all of them, and `destructiveHint: true` on the create/update tools —
-  especially `bulkCreateEquipment` (and the other bulk ops). Studio's
-  `ToolInvocationDialog` gates a confirm step on `annotations.destructiveHint`; if
-  niagaramcp doesn't set it, the generic Tools-catalog path runs those tools with
-  no warning. Relevant to **M3** (write & safety) — the Niagara write workflow
-  will lean on these. *(niagaramcp work — not now.)*
+- **Write-tool annotations are wrong.** niagaramcp's write / walkthrough tools
+  currently ship `readOnlyHint: true`, `destructiveHint: false` — should be
+  `readOnlyHint: false` on all of them and `destructiveHint: true` on the
+  create/update tools, especially `bulkCreateEquipment` (and the other bulk ops).
+  Studio's `ToolInvocationDialog` gates a confirm step on
+  `annotations.destructiveHint`; with the current values the generic Tools-catalog
+  path runs those tools with no warning. Relevant to **M3** (write & safety) — the
+  Niagara write workflow will lean on these. *(niagaramcp work — not now.)*
+- **Slot values come back localized.** `inspectComponent` / `getSlots` return
+  display-localized values (e.g. `"поистине"` instead of canonical `true`) — the
+  property sheet (C41) and BQL result table (C44) want the canonical form (with
+  the localized string available separately for display, if at all). Until fixed,
+  the Niagara plugin renders whatever the server sends. *(niagaramcp work.)*
+- **`bqlQuery` input format is hostile.** It requires a fully-qualified ORD
+  prefix (`station:|slot:/|bql:…`) on the query string; a plain `SELECT …` is
+  rejected. niagaramcp should either accept a plain `SELECT` and prepend a default
+  base ORD when no prefix is present, or split it into two fields (`baseOrd` +
+  `query`). The C44 BQL playground will paper over this on the client side
+  meanwhile (prepend a sensible default), but it's a server-side wart. *(niagaramcp
+  work.)*
 - **`rotateMcpToken` coordination** — see `docs/milestone-2.md` D5: the
   BearerResolver / user-Bearer write-auth flow (the `mcp:tokenHash` Tag) is **M3**,
   designed there alongside niagaramcp's token-rotation tool.
