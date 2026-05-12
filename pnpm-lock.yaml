@@ -38,6 +38,9 @@ importers:
       '@mcp-studio/mcp-client':
         specifier: workspace:*
         version: link:../../packages/mcp-client
+      '@mcp-studio/plugin-api':
+        specifier: workspace:*
+        version: link:../../packages/plugin-api
       '@mcp-studio/schema-form':
         specifier: workspace:*
         version: link:../../packages/schema-form

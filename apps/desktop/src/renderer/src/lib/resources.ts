@@ -6,12 +6,12 @@ import type {
   ResourceTemplateDescriptor,
 } from '@shared/domain/resource';
 
-async function fetchResources(connectionId: string): Promise<ResourceDescriptor[]> {
+export async function fetchResources(connectionId: string): Promise<ResourceDescriptor[]> {
   if (!window.studio) return [];
   return (await window.studio.invoke('connections:resources', { connectionId })).resources;
 }
 
-async function fetchResourceTemplates(connectionId: string): Promise<ResourceTemplateDescriptor[]> {
+export async function fetchResourceTemplates(connectionId: string): Promise<ResourceTemplateDescriptor[]> {
   if (!window.studio) return [];
   return (await window.studio.invoke('connections:resourceTemplates', { connectionId })).templates;
 }

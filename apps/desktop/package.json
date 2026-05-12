@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@mcp-studio/mcp-client": "workspace:*",
+    "@mcp-studio/plugin-api": "workspace:*",
     "@mcp-studio/schema-form": "workspace:*",
     "@mcp-studio/ui": "workspace:*",
     "@tanstack/react-query": "^5.100.9",

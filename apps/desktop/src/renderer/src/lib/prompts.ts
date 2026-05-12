@@ -2,7 +2,7 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import type { GetPromptResult, PromptDescriptor } from '@shared/domain/prompt';
 
-async function fetchPrompts(connectionId: string): Promise<PromptDescriptor[]> {
+export async function fetchPrompts(connectionId: string): Promise<PromptDescriptor[]> {
   if (!window.studio) return [];
   return (await window.studio.invoke('connections:prompts', { connectionId })).prompts;
 }
