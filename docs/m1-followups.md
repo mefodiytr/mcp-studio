@@ -2,6 +2,8 @@
 
 Things deliberately scoped out of Milestone 1, with a pointer to where they fit.
 Nothing here blocks the M1 deliverable; this is the "we know about it" list.
+(M2-deferred items live in `docs/m2-followups.md`; the niagaramcp-side
+coordination list below applies regardless of milestone.)
 
 ## Open before M1 is fully signed off
 

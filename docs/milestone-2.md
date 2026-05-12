@@ -203,6 +203,92 @@ at least its `serverInfo.name` — by here.)
   `@codemirror/autocomplete` / `@codemirror/language` (the BQL editor — lazy
   chunk), `@tanstack/react-virtual` (the tree).
 
+## Adjustments during the M2 build
+
+What actually changed vs. the plan above (so the doc reflects the shipped state
+without spelunking commit messages). Full deferred-items list: `docs/m2-followups.md`.
+
+**Phase A (C33–C37)** — landed as planned: `packages/ui` (vendored shadcn
+extracted — Button / Input / Dialog / Command + `cn` + the Tailwind base),
+`packages/plugin-api` (Plugin / PluginView / PluginContext / PluginCommand /
+PluginManifest + `matchesServerName` + `pluginManifestSchema`), the renderer
+plugin registry (`IN_BOX_PLUGINS` / `pickPlugin`), the extensible command
+registry (`useAppCommands` takes plugin-contributed commands), the `{{cwd}}`
+token (`stores/templating.ts`), a plugin-aware AppShell / LeftRail / TabBar
+(plugin views rendered in a `<Suspense>` for lazy components). No circular deps;
+the app behaves identically with no plugin. (The vendored-shadcn → `packages/ui`
+move grew the initial renderer chunk to ~800 kB — noted, not a regression.)
+
+**Phase B (C38–C39)** — `manifest.title` added to `pluginManifestSchema`
+(constructive: the host shows "Specialized by <title>" — it shouldn't hard-code
+"Niagara"); ConnectionCard badge. `manifest.matches: /^niagara/i` was a flagged
+assumption — **confirmed in Phase D**: the real `serverInfo.name` is `niagaramcp`
+(the C46 mock pins it; no change needed).
+
+**Phase C (C40–C45)**
+- **C41** — the property sheet is `inspectComponent` (identity + childCount)
+  over a `getSlots` slot table; *not* the facets/links/extensions panel the plan
+  sketched — the niagaramcp **read** surface (46 tools) has no `listLinks` /
+  `listExtensions` (those are *write* tools, M3), and `inspectComponent` is
+  identity-only. Slots come from `getSlots`, not `inspectComponent`. Display-only
+  (inline edit = M3); values shown verbatim (so niagaramcp's display-localized
+  `"поистине"` shows through — a niagaramcp-side wart, tracked).
+- **C40** — the slot tree is not virtualised: `@tanstack/react-virtual` (plan
+  D7) deferred — no observed slow-render need, avoids an un-cached dep mid-stream.
+  No per-node context menu — the cross-view bits ("open in property sheet /
+  folder view") need a host `ctx.openView(viewId)` hook on `PluginContext`;
+  deferred to a follow-up.
+- **C44** — the BQL editor is CodeMirror 6 via **`@uiw/react-codemirror`** (not
+  the bare `@codemirror/{state,view,commands,autocomplete,language}` set the plan
+  named under D6 — the pre-flagged offline-cache risk didn't bite). BQL
+  highlighting is a minimal `StreamLanguage` (not a Lezer grammar). The lazy
+  `BqlView` chunk is ~840 kB (CM6 + basic-setup) — slimming it (hand-rolled CM6)
+  + a dark editor theme + a full Lezer grammar are follow-ups. The `<ord>|bql:`
+  ORD prefix is built client-side from a Base-ORD field; row-capping is a
+  dedicated `limit` control; a stray SQL `LIMIT n` typed into the query is
+  stripped with a warning (both niagaramcp-side warts, tracked).
+- **C42** — quick-nav (`Ctrl/Cmd+P`) is rendered inside the Explorer view (works
+  while it's the active plugin view, the default); surfacing it as a host palette
+  command needs a host-level mount point for the dialog — follow-up.
+- **C45** — `toolSchemaHints` wired end-to-end: `ToolsCatalog` resolves the
+  active connection's plugin via `pickPlugin` and passes the per-tool hint to
+  `ToolInvocationDialog`, which shallow-merges it onto `tool.inputSchema` before
+  the args form. The niagara hints overlay English `title` / `description` /
+  `examples` onto niagaramcp's (partly Russian-only) schemas.
+
+**Phase D (C46–C47)**
+- **C46** — the in-process mock (`tests/fixtures/niagara-mock/server.mjs`) is a
+  **dependency-free stdio** server (newline-delimited JSON-RPC, the MCP stdio
+  transport), not Streamable HTTP as the plan said — simpler, and `tests/fixtures/*`
+  aren't workspace packages so a no-deps script is the clean shape. It replays
+  the recorded envelopes (`tools-list.json` + the four `*.json` samples). The
+  Playwright e2e (`tests/e2e/niagara-plugin.spec.ts`): connect → "46 tools" +
+  "Specialized by Niagara station" → Explorer tree (Services / Drivers; expand
+  Drivers → NiagaraNetwork) → select Drivers → Properties shows
+  `driver:DriverContainer` → BQL → Run → the recorded `oat` / `1 row` result.
+  Green ×3, flake-free.
+- **Found while testing (fixes between C45 and C46):**
+  - `useConnections()` now seeds from `connections:list` on mount — it only
+    subscribed to `connections:changed`, so a component mounted *after* a
+    connection was made (a plugin view opened from the rail, the Tools catalog
+    navigated to later) stayed empty until the next change event → "This plugin
+    view isn't available". (`fix(renderer): seed useConnections …`)
+  - `PluginContext.callTool` now unwraps the host's `{ result, error }` envelope
+    into the bare `CallToolResult` a plugin reads (`.structuredContent` /
+    `.content`) — it was forwarding the envelope verbatim, so *every* niagaramcp
+    read came back "empty". Throws on a transport/protocol `error` and on a
+    tool-reported `isError` result (so a plugin's `useQuery` surfaces it).
+    (`fix(plugin-host): unwrap the ToolCallOutcome …`)
+  - `@tanstack/react-query` + `react/jsx-runtime` added to the renderer's
+    `resolve.dedupe` — in the production build the lazily-chunked plugin views
+    got a *second* React Query instance ("No QueryClient set"); dev mode was
+    unaffected, so it only surfaced when the e2e ran the built app.
+    (in `test(niagara): in-process fixture server + plugin e2e`)
+- **niagaramcp-side coordination** items recorded in `docs/m1-followups.md`:
+  write-tool annotations wrong (`readOnlyHint: true` on create/update), slot
+  values display-localized, `bqlQuery` input format hostile, tool descriptions
+  partly Russian. None blocks M2; relevant to M3 (write & safety).
+
 ## Ad-hoc check-in triggers (otherwise: note-and-continue)
 
 1. The `packages/ui` extraction surfaces a hidden circular dependency between the
