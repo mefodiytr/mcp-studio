@@ -29,6 +29,15 @@ describe('pluginManifestSchema', () => {
     expect(pluginManifestSchema.safeParse({ name: 'niagara', version: '0.1.0', matches: 'niagara' }).success).toBe(true);
   });
 
+  it('treats `title` as an optional human label', () => {
+    expect(pluginManifestSchema.safeParse({ name: 'niagara', version: '0.1.0', matches: /x/ }).data?.title).toBeUndefined();
+    expect(
+      pluginManifestSchema.safeParse({ name: 'niagara', version: '0.1.0', title: 'Niagara station', matches: /x/ }).data
+        ?.title,
+    ).toBe('Niagara station');
+    expect(pluginManifestSchema.safeParse({ name: 'x', version: '0.1.0', title: '', matches: /x/ }).success).toBe(false);
+  });
+
   it('rejects a malformed manifest', () => {
     expect(pluginManifestSchema.safeParse({ name: '', version: '0.1.0', matches: /x/ }).success).toBe(false);
     expect(pluginManifestSchema.safeParse({ name: 'x', version: '', matches: /x/ }).success).toBe(false);

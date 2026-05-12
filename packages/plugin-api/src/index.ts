@@ -11,10 +11,13 @@ import { z } from 'zod';
 
 /** A plugin's identity + which servers it specializes (matched against
  *  `serverInfo.name`). `matches` is a `RegExp` for build-time plugins; a string
- *  is accepted and coerced to a `RegExp` (for a future manifest.json form). */
+ *  is accepted and coerced to a `RegExp` (for a future manifest.json form).
+ *  `title` is the human-readable label the host shows (badges, "specialized by"
+ *  hints); falls back to `name`. */
 export const pluginManifestSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
+  title: z.string().min(1).optional(),
   matches: z.union([z.instanceof(RegExp), z.string().min(1)]),
 });
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;

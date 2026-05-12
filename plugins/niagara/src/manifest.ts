@@ -9,5 +9,6 @@ import { pluginManifestSchema, type PluginManifest } from '@mcp-studio/plugin-ap
 export const NIAGARA_MANIFEST: PluginManifest = pluginManifestSchema.parse({
   name: 'niagara',
   version: '0.1.0',
+  title: 'Niagara station',
   matches: /^niagara/i,
 });

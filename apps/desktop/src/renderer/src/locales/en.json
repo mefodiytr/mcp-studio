@@ -171,7 +171,8 @@
     "unknownServer": "Unknown server",
     "tools": "tools",
     "resources": "resources",
-    "prompts": "prompts"
+    "prompts": "prompts",
+    "specializedBy": "Specialized by {{plugin}}"
   },
   "wizard": {
     "addTitle": "Add server",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Loader2, LogOut, Plus, RotateCw, Server, Unplug } from 'lucide-react';
+import { KeyRound, Loader2, LogOut, Plus, Puzzle, RotateCw, Server, Unplug } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -11,6 +11,7 @@ import { describeError } from '@renderer/lib/errors';
 import { getCredentialHint, useCreateProfile, useDeleteProfile, useProfiles } from '@renderer/lib/profiles';
 import { fetchTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
+import { pickPlugin } from '@renderer/plugins/registry';
 import type { OAuthStatus } from '@shared/domain/auth';
 import type { ConnectionSummary, ToolDescriptor } from '@shared/domain/connection';
 import type { Profile, ProfileInput } from '@shared/domain/profile';
@@ -279,6 +280,7 @@ function ConnectionCard({ connection, profileName }: { connection: ConnectionSum
   const [tools, setTools] = useState<ToolDescriptor[]>([]);
   const connected = connection.status === 'connected';
   const title = connection.serverInfo?.name ?? profileName ?? connection.profileId;
+  const plugin = pickPlugin(connection.serverInfo);
 
   useEffect(() => {
     if (!connected) {
@@ -302,6 +304,12 @@ function ConnectionCard({ connection, profileName }: { connection: ConnectionSum
             <span className={cn('size-1.5 shrink-0 rounded-full', DOT_BY_STATUS[connection.status])} aria-hidden />
             {title} {connection.serverInfo?.version && <span className="text-muted-foreground">{connection.serverInfo.version}</span>}
           </p>
+          {plugin && (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+              <Puzzle className="size-3" aria-hidden />
+              {t('connections.specializedBy', { plugin: plugin.manifest.title ?? plugin.manifest.name })}
+            </p>
+          )}
           {connection.status === 'signing-in' && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="size-3 animate-spin" aria-hidden /> {t('connections.signingIn')}
