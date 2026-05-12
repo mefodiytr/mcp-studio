@@ -8,11 +8,9 @@ coherent — and so a future contributor (or future me) can pick up the rhythm.
 ## Repo language: English only
 
 All source, comments, identifiers, commit messages, PR/issue text, and project
-docs are **English**. Two deliberate exceptions: `docs/master-spec.md` is
-bilingual (English headings, mixed prose — it's the original product brief, kept
-as written), and `tests/fixtures/niagara-mock/*.json` preserves real niagaramcp
-wire data verbatim (Russian tool descriptions included — that's the point of a
-fixture). Don't translate either.
+docs are **English**. One deliberate exception: `tests/fixtures/niagara-mock/*.json`
+preserves real niagaramcp wire data verbatim (Russian tool descriptions
+included — that's the point of a fixture). Don't translate it.
 
 ## Running locally
 

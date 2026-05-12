@@ -16,21 +16,21 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### What it replaces and what it adds
 
-| Тулзу | Что MCP Studio делает лучше |
+| Tool | What MCP Studio does better |
 |---|---|
-| MCP Inspector | Полноценная UI, persistent sessions, history, scripting |
-| Claude Desktop connectors | Прямой контроль, без OAuth-обязаловки, debug-grade visibility |
-| Workbench Property Sheet | Удалённо, без heavy Java client, скриптуемо |
-| Postman для MCP | Schema-aware forms, server capability awareness, multi-server workspaces |
-| `curl` + `jq` циклы | Один UI, history, recall, шаринг |
+| MCP Inspector | A full-fledged UI, persistent sessions, history, scripting |
+| Claude Desktop connectors | Direct control, no mandatory OAuth, debug-grade visibility |
+| Workbench Property Sheet | Remotely, without a heavy Java client, scriptable |
+| Postman for MCP | Schema-aware forms, server capability awareness, multi-server workspaces |
+| `curl` + `jq` loops | One UI, history, recall, sharing |
 
 ### Differentiators
 
-- **Workbench parity** для Niagara: explorer, property sheet, BQL playground, history viewer, watch-based monitoring.
-- **Universal MCP client**: работает с любым MCP сервером, плагинная архитектура для server-specific UI.
-- **Production-safe**: diff-and-approve workflow для write-операций, audit log, time-travel, restore points.
+- **Workbench parity** for Niagara: explorer, property sheet, BQL playground, history viewer, watch-based monitoring.
+- **Universal MCP client**: works with any MCP server, a plugin architecture for server-specific UI.
+- **Production-safe**: a diff-and-approve workflow for write operations, audit log, time-travel, restore points.
 - **Scriptable**: macro-recording, replay, parameterised templates, JSON-RPC pass-through.
-- **AI co-pilot integrated**: natural-language прослойка поверх tool catalog, доступна как боковая панель.
+- **AI co-pilot integrated**: a natural-language layer on top of the tool catalog, available as a side panel.
 
 ---
 
@@ -90,9 +90,9 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 ```
 
 **Why this split:**
-- Renderer стоит на React+Zustand+React Query — стандарт для production-grade desktop. Claude Code знает идиоматически.
-- Main process держит MCP-клиент в одном процессе, renderer общается через typed IPC — это даёт нам контроль над credentials (никогда не уходят в renderer), thread-safe сессии, и единую точку для logging/audit.
-- Plugin layer на стороне renderer: server-specific UI компоненты подгружаются по `serverInfo.name`. Niagara-плагин рендерит explorer, BQL, property sheet; для незнакомого сервера показывается generic tools/resources/prompts UI.
+- The renderer is built on React + Zustand + React Query — the standard for production-grade desktop. Claude Code knows it idiomatically.
+- The main process keeps the MCP client in a single process, the renderer communicates via typed IPC — this gives us control over credentials (they never leave for the renderer), thread-safe sessions, and a single point for logging/audit.
+- Plugin layer on the renderer side: server-specific UI components are loaded by `serverInfo.name`. The Niagara plugin renders the explorer, BQL, property sheet; for an unknown server a generic tools/resources/prompts UI is shown.
 
 ---
 
@@ -100,50 +100,50 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| Shell | **Electron 30+** | Universal binaries, mature, Claude Code excellent at it. (Tauri alt — меньше bundle, но Rust в стеке усложняет AI-driven dev.) |
+| Shell | **Electron 30+** | Universal binaries, mature, Claude Code excellent at it. (Tauri alt — smaller bundle, but Rust in the stack complicates AI-driven dev.) |
 | Frontend | **React 18 + TypeScript + Vite** | Industry standard, fast HMR, type safety end-to-end. |
 | UI components | **shadcn/ui + Tailwind CSS** | Modern design system, owned (not deps), themeable. |
-| State | **Zustand + React Query** | Zustand для local UI state, React Query для server state с caching/refetch. |
+| State | **Zustand + React Query** | Zustand for local UI state, React Query for server state with caching/refetch. |
 | MCP client | **@modelcontextprotocol/sdk** (TypeScript) | Official, typed, supports all transports. |
 | Forms | **react-hook-form + zod** | Schema-driven validation, generated from MCP tool input schemas. |
-| JSON viewer | **react-json-view-lite** или custom | Collapsible, copyable, searchable. |
+| JSON viewer | **react-json-view-lite** or custom | Collapsible, copyable, searchable. |
 | Code editor | **Monaco** (BQL, JSON, prompts) | VSCode's editor, syntax highlight, autocomplete hookable. |
-| Charts | **Recharts** или **uPlot** для live monitor | Время-серии, точечные значения. |
+| Charts | **Recharts** or **uPlot** for live monitor | Time series, point values. |
 | Persistence | **better-sqlite3** (workspace) + **electron-store** (config) | Local-first, no cloud dep. |
 | AI integration | **@anthropic-ai/sdk** | Optional co-pilot. User provides their own API key. |
 | Distribution | **electron-builder** | NSIS for Win, dmg for Mac, AppImage/deb for Linux. Auto-updater via electron-updater. |
 | Testing | **Vitest** (unit) + **Playwright** (e2e) | Standard. |
 
-Один язык (TypeScript) на всём stack'е, один package.json (monorepo через workspaces если будем разделять plugins). Claude Code пишет это в spec'е почти автономно.
+One language (TypeScript) across the whole stack, one package.json (a monorepo via workspaces if we split out plugins). Claude Code writes this from the spec almost autonomously.
 
 ---
 
 ## 5. Feature taxonomy
 
-Организовано по user goal, не по техническому слою.
+Organized by user goal, not by technical layer.
 
 ### 5.1 Connect to servers
 
-**G:** «I have an MCP server — let me connect to it and explore.»
+**G:** "I have an MCP server — let me connect to it and explore."
 
-- **Connection wizard** — добавление нового сервера: transport (HTTP/SSE/stdio), URL, auth method (none / Bearer / OAuth / custom header).
-- **Server profiles** — saved connections с тегами (env: dev/staging/prod, project: foo/bar). Quick-switch dropdown.
-- **Workspace** — группа профилей. Можно держать несколько workspaces (например, разные клиенты).
+- **Connection wizard** — adding a new server: transport (HTTP/SSE/stdio), URL, auth method (none / Bearer / OAuth / custom header).
+- **Server profiles** — saved connections with tags (env: dev/staging/prod, project: foo/bar). Quick-switch dropdown.
+- **Workspace** — a group of profiles. You can keep several workspaces (e.g. different clients).
 - **Connection inspector** — live status, latency, session id, capabilities (tools/resources/prompts counts).
-- **Multi-session per server** — несколько одновременных подключений к одному серверу под разными identity (apiToken / user-Bearer / OAuth).
+- **Multi-session per server** — several simultaneous connections to one server under different identities (apiToken / user-Bearer / OAuth).
 
 ### 5.2 Discover capabilities
 
-**G:** «What can this server do?»
+**G:** "What can this server do?"
 
-- **Tools catalog** — поиск, фильтр по category/annotations, schema view, last-call timestamps.
-- **Resources browser** — static URIs и templates, preview content, MIME-aware rendering (JSON, Markdown, image).
+- **Tools catalog** — search, filter by category/annotations, schema view, last-call timestamps.
+- **Resources browser** — static URIs and templates, preview content, MIME-aware rendering (JSON, Markdown, image).
 - **Prompts library** — list of declared prompts, parameter forms, preview of generated message stream.
 - **Server capabilities** — protocol version, server info, advertised capabilities, transports.
 
 ### 5.3 Invoke tools
 
-**G:** «I want to call a tool with specific arguments and see the result.»
+**G:** "I want to call a tool with specific arguments and see the result."
 
 - **Schema-derived form** — automatically generated from each tool's input JSON schema (zod runtime + react-hook-form). Type-correct widgets (numeric slider with bounds, enum dropdown with values, autocomplete for known reference types).
 - **Result viewer** — structured content rendered as table/tree/JSON; text content with syntax highlight; errors with code + data expansion.
@@ -154,7 +154,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.4 Browse Niagara station (plugin)
 
-**G:** «I want to navigate the station like a file tree.»
+**G:** "I want to navigate the station like a file tree."
 
 - **Tree explorer (left panel)** — lazy-loaded, virtualised tree of station slot hierarchy. Click to expand, drag to reorder (where supported), context menu per node.
 - **Breadcrumb bar** — current path with clickable segments. Always-visible.
@@ -165,7 +165,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.5 Edit components (Niagara plugin)
 
-**G:** «I want to create, modify, and remove station structure safely.»
+**G:** "I want to create, modify, and remove station structure safely."
 
 - **Inline create** — right-click in any folder → `New… → Folder | Numeric Writable | Boolean Writable | …`. Dialog with schema-derived form (type picker, facets builder, initial value).
 - **Inline edit slot** — double-click any property in the property sheet → editable. Save on Enter / blur. Errors shown inline.
@@ -177,7 +177,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.6 Diff & approve
 
-**G:** «I'm about to push 15 changes. Let me see them all before committing.»
+**G:** "I'm about to push 15 changes. Let me see them all before committing."
 
 - **Pending changes queue** — every write operation while "Hold" mode is enabled gets queued, not executed.
 - **Diff view** — visual list of pending operations: `+ created`, `~ modified`, `- removed`. Per-operation toggle.
@@ -187,7 +187,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.7 BQL playground (Niagara plugin)
 
-**G:** «I want to write a BQL query and see results.»
+**G:** "I want to write a BQL query and see results."
 
 - **Monaco editor** with BQL syntax highlighting (custom language def).
 - **Autocomplete** for known component types, slot names, operators (probed live from station).
@@ -198,7 +198,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.8 Live monitor (Niagara plugin)
 
-**G:** «I want to watch 10 points update in real time.»
+**G:** "I want to watch 10 points update in real time."
 
 - **Watch list** — drag points from tree → watch panel. Each row shows current value + facets + status + last-update timestamp.
 - **Polling adaptive** — read all watched points every N seconds (configurable, default 5s). Diff to avoid flicker.
@@ -209,7 +209,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.9 History viewer (Niagara plugin)
 
-**G:** «I want to see historical values, not just live ones.»
+**G:** "I want to see historical values, not just live ones."
 
 - **History tool integration** — via `readHistory` MCP tool.
 - **Range picker** — from/to with calendar; presets (last hour / day / week / month).
@@ -219,7 +219,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.10 Macros & automation
 
-**G:** «I want to record a sequence of operations and replay it.»
+**G:** "I want to record a sequence of operations and replay it."
 
 - **Record mode** — every tool call captured into a named macro. Stop recording when done.
 - **Macro library** — saved macros in workspace, parametrised via templating.
@@ -230,19 +230,19 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.11 AI co-pilot
 
-**G:** «Tell me what to do in plain English, do it for me.»
+**G:** "Tell me what to do in plain English, do it for me."
 
 - **Side panel** — chat with Anthropic Claude (user provides API key in settings).
 - **Tool-aware** — Claude has access to current server's tools and can call them. The user sees tool-calls happen inline.
 - **Confirmation gate** — destructive tools require user confirmation in chat before execution.
 - **Context-aware** — current cwd, selected component, last result are auto-included in Claude's context.
-- **Macro generation** — «record a macro that creates 10 numeric points named oat_1..oat_10» → Claude proposes macro, user reviews, saves.
+- **Macro generation** — "record a macro that creates 10 numeric points named oat_1..oat_10" → Claude proposes macro, user reviews, saves.
 - **Documentation lookup** — Claude can read server's resources (manuals, schemas) before answering.
 - **Token cost meter** — always-visible counter so user knows what they're spending.
 
 ### 5.12 Observability
 
-**G:** «Show me what's actually happening under the hood.»
+**G:** "Show me what's actually happening under the hood."
 
 - **Protocol inspector** — dockable panel showing live JSON-RPC stream. Filter by method, by status, by duration.
 - **Performance timeline** — per-call latency distribution. Histogram + slowest-N. Helps diagnose server bottlenecks.
@@ -252,7 +252,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.13 Compare & sync (advanced)
 
-**G:** «I want to compare two stations' configurations or sync between dev and prod.»
+**G:** "I want to compare two stations' configurations or sync between dev and prod."
 
 - **Side-by-side explorer** — two trees, two property sheets. Diff highlighting.
 - **Path comparison** — pick subtree on each side, see structural diff (components added/removed/modified).
@@ -261,7 +261,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 
 ### 5.14 Permission visualizer (Niagara plugin)
 
-**G:** «Show me what mcpSmokeUser can actually do.»
+**G:** "Show me what mcpSmokeUser can actually do."
 
 - **User picker + matrix view** — rows = categories/folders, columns = permissions (r/w/i/R/W/I), cells filled per user's effective rights.
 - **Why is this allowed/denied?** — click any cell, see resolved permission chain (user → roles → categories → permissions).
@@ -271,7 +271,7 @@ For other MCP servers, it provides the same universal substrate: tools, resource
 ## 6. UX paradigms
 
 ### Command palette (⌘K / Ctrl+K)
-Every action discoverable by name. «create folder», «commit station», «open monitor for /Drivers/RTU1». Powered by Cmdk library.
+Every action discoverable by name. "create folder", "commit station", "open monitor for /Drivers/RTU1". Powered by Cmdk library.
 
 ### Multi-tab workspace
 Like VSCode/browser tabs. Each tab = one "view" (explorer, BQL, monitor, history). Multiple servers can have tabs side-by-side.
@@ -342,10 +342,10 @@ Every panel has a thoughtful empty state explaining what it does and how to popu
 
 ## 8. Roadmap
 
-Каждый milestone — 3–5 недель работы Claude Code в рамках одного project.
+Each milestone is 3–5 weeks of Claude Code work within a single project.
 
 ### Milestone 1 — Foundation (4 weeks)
-- Electron + Vite + React + TS skeleton, design system установлен.
+- Electron + Vite + React + TS skeleton, design system in place.
 - Connection management: profile CRUD, transport adapters (HTTP), MCP client integration.
 - Tools catalog + schema-derived invocation form + result viewer.
 - Resources browser + Prompts library (read-only).
@@ -486,97 +486,97 @@ Monorepo via pnpm workspaces. Single `pnpm dev` to launch Electron with hot relo
 
 ## 12. What this is NOT
 
-Чтобы scope не разъезжался — явные границы:
+To keep the scope from drifting — explicit boundaries:
 
-- **Not a Niagara replacement.** Workbench делает много вещей, которых MCP Studio не пытается покрыть: PX graphics editor, complex wire sheets, station provisioning, security manager, license management. MCP Studio — про data & tools, не про IDE.
-- **Not a generic SCADA HMI.** Live monitor / dashboards дают наглядность, но это не визуализация уровня PX. Для production-операторов остаётся Workbench / front-end.
-- **Not an MCP server framework.** Мы клиент, не authoring tool для серверов. Хотя экспорт macros в код — лёгкий шаг в эту сторону, мы там не углубляемся.
-- **Not multi-tenant SaaS.** Local-first by design. Все данные на устройстве пользователя.
-- **Not a chat client.** AI co-pilot — feature, не центр продукта. Claude Desktop остаётся лучшим выбором для основного чат-flow.
+- **Not a Niagara replacement.** Workbench does many things MCP Studio doesn't try to cover: PX graphics editor, complex wire sheets, station provisioning, security manager, license management. MCP Studio is about data & tools, not about being an IDE.
+- **Not a generic SCADA HMI.** Live monitor / dashboards give visibility, but this isn't PX-level visualization. For production operators, Workbench / a front-end remains.
+- **Not an MCP server framework.** We're a client, not an authoring tool for servers. Although exporting macros to code is an easy step in that direction, we don't go deep there.
+- **Not multi-tenant SaaS.** Local-first by design. All data on the user's device.
+- **Not a chat client.** The AI co-pilot is a feature, not the center of the product. Claude Desktop remains the best choice for the main chat flow.
 
 ---
 
 ## 13. Success metrics
 
-После 1.0:
+After 1.0:
 
-- Полный цикл MCP-разработчика (create server → test tools → debug → ship) проходится в Studio за время существенно меньшее, чем через Inspector + cURL + Claude Desktop вместе взятые.
-- Niagara-оператор может выполнить базовые задачи (создать точку, добавить history, запустить BQL, прочитать тренд) без открытия Workbench.
-- Macro «выполни мой типовой commissioning-сценарий на новой станции» работает end-to-end без вмешательства.
-- AI co-pilot способен по фразе на русском воспроизвести смысловую операцию через tools без переспросов в 80%+ случаев.
-- 100k-компонентная станция отзывчива (interaction < 100ms на actions, tree expand < 500ms).
+- The full MCP developer cycle (create server → test tools → debug → ship) goes through Studio in substantially less time than via Inspector + cURL + Claude Desktop combined.
+- A Niagara operator can perform basic tasks (create a point, add a history, run BQL, read a trend) without opening Workbench.
+- A macro "run my typical commissioning scenario on a new station" works end-to-end without intervention.
+- The AI co-pilot is able, from a phrase in Russian, to reproduce the intended operation via tools without follow-up questions in 80%+ of cases.
+- A 100k-component station is responsive (interaction < 100ms on actions, tree expand < 500ms).
 
 ### Cross-cutting policy — coverage as a ratchet
 
-Каждый package с `vitest`-coverage имеет **floor-пороги в `vitest.config.ts`, которые только растут**. Когда покрытие чего-либо реально низкое (например, `mcp-client` в M1 — happy path покрыт интеграционным тестом + e2e, но HTTP/SSE-транспорты и error/disconnect-пути ещё нет), порог ставится чуть ниже фактического числа — это regression-фильтр, не aspiration. По мере добавления тестов floor поднимается тем же коммитом. Никогда не «напишем тесты потом» без зафиксированного нижнего порога; никогда не понижать floor (только хотфикс с явным обоснованием в commit-сообщении). `schema-form` — ≥90 (lines/funcs/stmts) с M1; `mcp-client` — floor 55/40/55/50 (lines/funcs/stmts/branches) с M1, поднять при добавлении транспорт- и error-path-тестов.
+Every package with `vitest` coverage has **floor thresholds in `vitest.config.ts` that only go up**. When coverage of something is genuinely low (e.g. `mcp-client` in M1 — the happy path is covered by an integration test + e2e, but the HTTP/SSE transports and error/disconnect paths aren't yet), the threshold is set just below the actual number — it's a regression filter, not an aspiration. As tests are added, the floor is raised in the same commit. Never "we'll write tests later" without a recorded lower bound; never lower the floor (only a hotfix with an explicit rationale in the commit message). `schema-form` — ≥90 (lines/funcs/stmts) since M1; `mcp-client` — floor 55/40/55/50 (lines/funcs/stmts/branches) since M1, raise it when transport- and error-path tests are added.
 
 ---
 
-## 14. Открытые вопросы для следующей итерации
+## 14. Open questions for the next iteration
 
-1. **Auth для non-Niagara MCP servers** — OAuth flow интегрировать сразу или Bearer-only в 1.0?
-2. **Plugin sandboxing** — насколько изолировать сторонние plugins? Iframe-style или trust-by-default?
-3. **Wire sheet** — это stretch goal или critical Niagara parity feature? Зависит от пользователей.
-4. **Cloud sync для workspace** — потребность есть, но добавляет surface для security и persistence. Откладываем на post-1.0 или включаем как опцию?
-5. **Mobile companion** — стоит ли вкладываться, и в какой форме (read-only, или полноценный)?
+1. **Auth for non-Niagara MCP servers** — integrate the OAuth flow right away, or Bearer-only in 1.0?
+2. **Plugin sandboxing** — how much to isolate third-party plugins? Iframe-style or trust-by-default?
+3. **Wire sheet** — is this a stretch goal or a critical Niagara parity feature? Depends on users.
+4. **Cloud sync for the workspace** — there's a need, but it adds surface for security and persistence. Defer to post-1.0 or include as an option?
+5. **Mobile companion** — is it worth investing in, and in what form (read-only, or full-featured)?
 
-Эти вопросы — для product-discovery после первых 2 milestones, когда есть пользователи и фидбек.
+These questions are for product discovery after the first 2 milestones, once there are users and feedback.
 
 ### Resolved in M1 kickoff (2026-05-11)
 
-Решения, принятые на старте Milestone 1 — здесь, чтобы будущий читатель спеки понимал «почему так» без раскопок в переписке. Детальный план M1 (atomic commits + acceptance criteria + repo-структура с Δ-списком отклонений от §11): `docs/milestone-1.md`.
+Decisions made at the start of Milestone 1 — here so a future reader of the spec understands "why this way" without digging through correspondence. The detailed M1 plan (atomic commits + acceptance criteria + repo structure with a Δ-list of deviations from §11): `docs/milestone-1.md`.
 
-1. **Shell — Electron** (не Tauri). Tauri экономит мегабайты ценой Rust-знаний в стеке; для Claude-Code-driven workflow и Node-нативных интеграций (keytar/safeStorage, electron-updater, stdio-subprocess) это бесполезный обмен. §4 это и предполагал; решение подтверждено.
-2. **M1 protocol scope — «Standard»: HTTP + stdio + Bearer / custom header / none.** stdio — первичный транспорт по spec и в туториалах сообщества; «MCP-клиент без stdio» — половинчатое позиционирование. OAuth 2.1 / PKCE (redirect listener, refresh, dynamic client registration) — слишком большая поверхность для M1; вынесен в **«M1.5» OAuth mini-milestone** сразу за M1, до Niagara-плагина в M2. Последовательность: universal HTTP+stdio → +OAuth → Niagara plugin. (Закрывает §14.1 для фазы M1.)
-3. **Persistence — pure-JS в M1, миграция на better-sqlite3 в M4.** `electron-store` + lowdb-стиль JSON для профилей и tool-call history; better-sqlite3 — native-модуль, ABI-ребилды по матрице Win/Mac/Linux в фундаменте = недели debugging вместо feature delivery. Shape данных проектируется queryable-friendly, в коде явный `// TODO(M4): migrate to better-sqlite3`, чтобы миграция была механической (триггер — macros + audit log из M4/M5, которым нужен queryable backend). Отклонение от §4 «better-sqlite3 (workspace)».
-4. **License — Proprietary / All Rights Reserved** на время разработки. Минимальный copyright-notice в исходниках. OSS-решение (MIT/Apache vs commercial vs internal) — после 1.0; не закрываем опции заранее, на скоуп M1 не влияет.
-5. **shadcn/ui вендорится в `apps/desktop/src/renderer/components/ui`**, `packages/ui` не создаётся до M2. shadcn — copy-in source, не dep; при одном потребителе общий пакет = чистый оверхед + лишний слой абстракции при каждой кастомизации. Естественный момент выноса — M2, когда Niagara-плагину понадобятся те же компоненты. Отклонение от §11 (`packages/ui`).
-6. **Прочее, зафиксированное на старте:** pnpm + electron-vite как build-tool (electron-vite даёт ровно тройку `src/main | src/preload | src/renderer` из §11 одним конфигом — отклонение от §11/§4, где назван только «Vite»); monorepo с первого дня (`packages/{mcp-client, schema-form, plugin-api}` — реальные workspace-пакеты; пустых plugin-стабов нет); main process = единственный источник истины по соединениям и кредам, креды никогда не пересекают границу в renderer; React Query (server-state) + Zustand (UI-state); **React 18**, не 19 (stability over novelty для foundation; upgrade на 19 — отдельный коммит при конкретной причине, напр. React Compiler); i18next подключён, строки только English в M1; e2e против `@modelcontextprotocol/server-everything` (без самописного мока — избегаем техдолга в фундаменте); без code signing / notarization в M1 (unsigned-артефакты в CI как proof рабочего packaging; signing — M8); Python-PoC (`mcp_app.py`, `mcp_console.py`) архивированы в `prototypes/`, не в production git-историю; `@modelcontextprotocol/sdk` оборачивается, JSON-RPC не реимплементируется.
+1. **Shell — Electron** (not Tauri). Tauri saves megabytes at the cost of Rust knowledge in the stack; for a Claude-Code-driven workflow and Node-native integrations (keytar/safeStorage, electron-updater, stdio-subprocess) that's a useless trade. §4 already assumed this; the decision is confirmed.
+2. **M1 protocol scope — "Standard": HTTP + stdio + Bearer / custom header / none.** stdio is the primary transport per the spec and in community tutorials; "an MCP client without stdio" is half-baked positioning. OAuth 2.1 / PKCE (redirect listener, refresh, dynamic client registration) is too large a surface for M1; moved into an **"M1.5" OAuth mini-milestone** right after M1, before the Niagara plugin in M2. Sequence: universal HTTP+stdio → +OAuth → Niagara plugin. (Closes §14.1 for the M1 phase.)
+3. **Persistence — pure-JS in M1, migration to better-sqlite3 in M4.** `electron-store` + lowdb-style JSON for profiles and tool-call history; better-sqlite3 is a native module — ABI rebuilds across the Win/Mac/Linux matrix in the foundation = weeks of debugging instead of feature delivery. The data shape is designed to be queryable-friendly, with an explicit `// TODO(M4): migrate to better-sqlite3` in the code so the migration is mechanical (the trigger is macros + audit log from M4/M5, which need a queryable backend). A deviation from §4's "better-sqlite3 (workspace)".
+4. **License — Proprietary / All Rights Reserved** during development. A minimal copyright notice in the sources. The OSS decision (MIT/Apache vs commercial vs internal) is for after 1.0; we don't close off options in advance, and it doesn't affect the M1 scope.
+5. **shadcn/ui is vendored in `apps/desktop/src/renderer/components/ui`**, `packages/ui` is not created until M2. shadcn is copy-in source, not a dep; with a single consumer a shared package = pure overhead + an extra abstraction layer on every customization. The natural moment to extract it is M2, when the Niagara plugin needs the same components. A deviation from §11 (`packages/ui`).
+6. **Other things fixed at the start:** pnpm + electron-vite as the build tool (electron-vite gives exactly the `src/main | src/preload | src/renderer` triad from §11 in one config — a deviation from §11/§4, which name only "Vite"); a monorepo from day one (`packages/{mcp-client, schema-form, plugin-api}` are real workspace packages; no empty plugin stubs); the main process = the single source of truth for connections and credentials, credentials never cross the boundary into the renderer; React Query (server state) + Zustand (UI state); **React 18**, not 19 (stability over novelty for the foundation; an upgrade to 19 is a separate commit for a concrete reason, e.g. the React Compiler); i18next wired in, English-only strings in M1; e2e against `@modelcontextprotocol/server-everything` (no hand-rolled mock — avoiding tech debt in the foundation); no code signing / notarization in M1 (unsigned artifacts in CI as proof of working packaging; signing is M8); the Python PoCs (`mcp_app.py`, `mcp_console.py`) archived in `prototypes/`, not in the production git history; `@modelcontextprotocol/sdk` is wrapped, JSON-RPC is not reimplemented.
 
-Полный список отклонений от §11 (Δ1–Δ8) с обоснованиями — в `docs/milestone-1.md`.
+The full list of deviations from §11 (Δ1–Δ8) with rationale — in `docs/milestone-1.md`.
 
 ### Adjustments during the M1 build
 
-Уточнения, всплывшие по ходу реализации (после kickoff). Здесь — чтобы спека отражала фактический state без раскопок в commit-сообщениях.
+Refinements that came up during implementation (after kickoff). Here so the spec reflects the actual state without digging through commit messages.
 
-- **§4 persistence — самописный `JsonStore` вместо `electron-store`.** ~100-строчный dependency-free JSON-file store в main (`config.json` / `workspace.json` / `credentials.json` в userData; load-on-construct, atomic `*.tmp`→rename на save, `schemaVersion` + `migrate()` hook). Причина: `electron-store` v9+ — ESM-only, что трётся с CJS-бандлом main-процесса; самописный store проще мигрировать на better-sqlite3 в M4, чем переходить через abstraction electron-store. Миграция на better-sqlite3 в M4 не меняется (явный `// TODO(M4)` в `json-store.ts`). [C5]
-- **Тема (`light | dark | system`) хранится в renderer `localStorage`**, не в main config — вопреки буквальному «config хранит theme» из §4/M1-плана. Тема применяется к `<html>` синхронно до первого paint (`main.tsx`), что требует синхронного чтения; localStorage это даёт, async-IPC до первого paint — нет (был бы FOUC). Main config держит остальное (window bounds, feature flags). [C3/C5]
-- **ESM `@modelcontextprotocol/sdk` бандлится в CJS main-bundle** (`externalizeDepsPlugin({ exclude: ['@mcp-studio/mcp-client'] })` в electron-vite main-конфиге; main-bundle ~480 кБ). Причина: Electron 33.2.1 несёт Node 20.18.1, который не умеет `require()` ESM. Renderer всегда ESM (Vite). Обратимо — при оптимизации сборки в M8 можно вернуться к ESM-main, если будет выгода. [C7b]
-- **Electron запинен на `33.2.1` (exact)** вместо последнего 33.x — версия из локального `@electron/get`-кэша; свежий 33.x стопорился на ~115 МБ-загрузке бинаря. Бамп — отдельным коммитом, когда удобно (33-ветка ещё получает security-fixes). [C2]
-- **C7 разъехался на C7 + C7b** в плане: C7 = пакет `mcp-client` (по плану); C7b = минимальный `ConnectionManager` + `connections:*` IPC + `ConnectionsView` dev-харнесс — заимствует куски C8 (connection manager) и C11 (connection inspector) на 2 коммита раньше ради сквозного «proof of life». C8/C11 «по-настоящему» дополняют минимальные версии, не переписывают. [C7b]
-- **Команд-палитра — `cmdk`** (вендоренный shadcn-обёртка `components/ui/command.tsx`). Команды собирает shell-хук `useAppCommands` (built-ins: переход к view, toggle инспектора/темы, reload, connect/disconnect профиля, re-run последнего тула, context-scoped «clear history» только на History-view). Полноценный plugin-contributed command registry — M2 (вместе с plugin-API). [C21]
-- **Tab/layout state — Zustand** (`stores/workspace.ts`, persist в `localStorage`). Tab = инстанс view + (forward-looking) optional `connectionId` + `pinned`; open/close/reorder(drag)/pin. В M1 каждый view-tab держит свой connection-picker — привязка таба к конкретному коннекшену в UI не выставлена (есть в data-модели). [C22]
-- **Renderer code-split** — feature-views (`tools`/`resources`/`prompts`/`history`/`raw`/`inspector`/`connections`) грузятся через `React.lazy` за `<Suspense>`; schema-form (+ react-hook-form + zod) уезжает в отдельный ~228 кБ-чанк on-demand. Initial renderer bundle ~681 кБ (был ~1.0 МБ). [C24]
-- **e2e — Playwright + Electron** (`tests/e2e/`, не workspace-пакет; `pnpm test:e2e` сначала билдит). Один спек прогоняет happy path против `@modelcontextprotocol/server-everything` по stdio: launch → wizard добавляет stdio-профиль → connect → Tools → invoke `echo` → result-viewer → инспектор показывает `tools/call`. Coverage-гейты: `schema-form` ≥90 (как было), `mcp-client` — regression-floor (lines 55 / funcs 40 / stmts 55 / branches 50; фактически ~68/45/68/67), поднять когда добавятся unit-тесты HTTP/SSE-транспортов и error-путей. CI: lint → typecheck → unit → build → e2e (xvfb на Linux). [C23]
-- **`node-linker=hoisted` перенесён из `.npmrc` в `pnpm-workspace.yaml`** (`nodeLinker: hoisted`) — pnpm 11 читает его оттуда; в `.npmrc` он не применялся ко всему workspace (electron не оказывался в корневом `node_modules`). electron-builder хочет плоское `node_modules` для пакуемого приложения. [C24]
-- **electron-builder — unsigned smoke only.** `apps/desktop/electron-builder.yml` (NSIS / dmg / AppImage), `pnpm --filter @mcp-studio/desktop dist`; без code-signing/notarization в M1. `apps/desktop/build/` (кастомные иконки/installer-ассеты) пока нет — дефолты Electron. [C24]
-- **`packages/plugin-api` пока не создан** (план §11/layout его упоминает) — создаётся в M2, когда появится первый плагин. [M1 build]
-- **Markdown-ресурсы в превью показываются как monospace-текст** (не рендерятся) — настоящий рендерер (`react-markdown`) — dep+bundle-cost, не оправдан в M1. `oneOf`/`anyOf` discriminated-union schema-form рендерит через `json`-escape-hatch, не через variant-picker. Оба — M2 polish. См. `docs/m1-followups.md`. [C18]
+- **§4 persistence — a hand-rolled `JsonStore` instead of `electron-store`.** A ~100-line dependency-free JSON-file store in main (`config.json` / `workspace.json` / `credentials.json` in userData; load-on-construct, atomic `*.tmp`→rename on save, `schemaVersion` + a `migrate()` hook). Reason: `electron-store` v9+ is ESM-only, which conflicts with the CJS bundle of the main process; a hand-rolled store is easier to migrate to better-sqlite3 in M4 than to go through electron-store's abstraction. The better-sqlite3 migration in M4 is unchanged (an explicit `// TODO(M4)` in `json-store.ts`). [C5]
+- **The theme (`light | dark | system`) is stored in renderer `localStorage`**, not in the main config — contrary to the literal "config stores the theme" in §4/the M1 plan. The theme is applied to `<html>` synchronously before the first paint (`main.tsx`), which requires a synchronous read; localStorage provides that, async IPC before the first paint doesn't (it'd be a FOUC). The main config keeps the rest (window bounds, feature flags). [C3/C5]
+- **The ESM `@modelcontextprotocol/sdk` is bundled into the CJS main bundle** (`externalizeDepsPlugin({ exclude: ['@mcp-studio/mcp-client'] })` in the electron-vite main config; main bundle ~480 kB). Reason: Electron 33.2.1 ships Node 20.18.1, which can't `require()` ESM. The renderer is always ESM (Vite). Reversible — during build optimization in M8 we can go back to an ESM main if there's a benefit. [C7b]
+- **Electron pinned to `33.2.1` (exact)** instead of the latest 33.x — the version from the local `@electron/get` cache; a fresh 33.x stalled on the ~115 MB binary download. A bump is a separate commit when convenient (the 33 branch still gets security fixes). [C2]
+- **C7 split into C7 + C7b** in the plan: C7 = the `mcp-client` package (as planned); C7b = a minimal `ConnectionManager` + `connections:*` IPC + a `ConnectionsView` dev harness — it borrows pieces of C8 (connection manager) and C11 (connection inspector) two commits early for an end-to-end "proof of life". C8/C11 "for real" extend the minimal versions, they don't rewrite them. [C7b]
+- **The command palette — `cmdk`** (the vendored shadcn wrapper `components/ui/command.tsx`). Commands are assembled by the shell hook `useAppCommands` (built-ins: navigate to a view, toggle the inspector/theme, reload, connect/disconnect a profile, re-run the last tool, a context-scoped "clear history" only on the History view). A full plugin-contributed command registry is M2 (together with the plugin API). [C21]
+- **Tab/layout state — Zustand** (`stores/workspace.ts`, persisted to `localStorage`). A tab = a view instance + a (forward-looking) optional `connectionId` + `pinned`; open/close/reorder(drag)/pin. In M1 each view tab keeps its own connection picker — binding a tab to a specific connection isn't exposed in the UI (it's in the data model). [C22]
+- **Renderer code-split** — the feature views (`tools`/`resources`/`prompts`/`history`/`raw`/`inspector`/`connections`) are loaded via `React.lazy` behind `<Suspense>`; schema-form (+ react-hook-form + zod) moves into a separate ~228 kB on-demand chunk. Initial renderer bundle ~681 kB (was ~1.0 MB). [C24]
+- **e2e — Playwright + Electron** (`tests/e2e/`, not a workspace package; `pnpm test:e2e` builds first). One spec runs the happy path against `@modelcontextprotocol/server-everything` over stdio: launch → the wizard adds an stdio profile → connect → Tools → invoke `echo` → the result viewer → the inspector shows `tools/call`. Coverage gates: `schema-form` ≥90 (as before), `mcp-client` — a regression floor (lines 55 / funcs 40 / stmts 55 / branches 50; actually ~68/45/68/67), raise it when unit tests for the HTTP/SSE transports and error paths are added. CI: lint → typecheck → unit → build → e2e (xvfb on Linux). [C23]
+- **`node-linker=hoisted` moved from `.npmrc` into `pnpm-workspace.yaml`** (`nodeLinker: hoisted`) — pnpm 11 reads it from there; in `.npmrc` it wasn't applied to the whole workspace (electron didn't end up in the root `node_modules`). electron-builder wants a flat `node_modules` for the packaged app. [C24]
+- **electron-builder — unsigned smoke only.** `apps/desktop/electron-builder.yml` (NSIS / dmg / AppImage), `pnpm --filter @mcp-studio/desktop dist`; no code signing/notarization in M1. `apps/desktop/build/` (custom icons/installer assets) doesn't exist yet — Electron defaults. [C24]
+- **`packages/plugin-api` not created yet** (the §11/layout plan mentions it) — created in M2, when the first plugin appears. [M1 build]
+- **Markdown resources in the preview are shown as monospace text** (not rendered) — a real renderer (`react-markdown`) is a dep+bundle cost, not justified in M1. schema-form renders `oneOf`/`anyOf` discriminated unions via the `json` escape hatch, not via a variant picker. Both are M2 polish. See `docs/m1-followups.md`. [C18]
 
-См. `docs/m1-followups.md` — полный список отложенного из M1 с указанием, куда оно встаёт.
+See `docs/m1-followups.md` — the full list of items deferred from M1 with where each fits.
 
 ### M1.5 — OAuth (2026-05-12, `v0.1.5-m1.5`)
 
-Третий auth-метод (наряду с none / bearer / header): **OAuth 2.1 + PKCE**. План — `docs/milestone-1.5.md` (commits C25–C32).
+A third auth method (alongside none / bearer / header): **OAuth 2.1 + PKCE**. The plan — `docs/milestone-1.5.md` (commits C25–C32).
 
-- **Что делает SDK, что делаем мы.** `@modelcontextprotocol/sdk` уже реализует (и тестирует) discovery (`.well-known/oauth-protected-resource` → `.well-known/oauth-authorization-server` (RFC 8414) → `openid-configuration`), PKCE (S256), `auth()`-оркестратор, DCR (RFC 7591), code-exchange, refresh, и в транспортах — try-token → refresh-on-401 → `redirectToAuthorization` + `UnauthorizedError`. Мы пишем: реализацию SDK-интерфейса `OAuthClientProvider` (`packages/mcp-client/src/oauth.ts` — storage-агностичная, вшивается в credential vault), loopback-redirect-listener в main (`main/oauth/redirect.ts`, RFC 8252 §7.3 — one-shot `127.0.0.1:<ephemeral>/callback`), glue в `ConnectionManager.connectOAuth` (`Connection.create({authProvider})` → has-token / `PendingAuthError`→`waitForCallback`→`finishAuth`→reconnect; refresh-then-reject-guard с max-1-retry; mid-session 401 → `auth-required`, no auto-retry; cancellation pathway закрывает listener немедленно — no orphans), wizard-секцию (`oauth`-radio + scope + pre-registered client-id с hint'ом), sign-in/out UI + command-palette-команды, и e2e против SDK-демо-сервера (`examples/server/simpleStreamableHttp.js --oauth`, headless через `MCPSTUDIO_OAUTH_AUTOAPPROVE`).
-- **Хранение.** Токены + DCR client-info (+ `tokensSavedAt` для absolute-expiry) — одним зашифрованным JSON-блобом per profile в credential vault (`schemaVersion` 1→2). PKCE-verifier — только in-memory. Renderer видит только redacted status (`oauth:status` → signed-out/signed-in/expired + expiresAt + scope; `oauth:signOut`).
-- **DCR с fallback.** DCR используется, если auth-server-metadata содержит `registration_endpoint`; иначе — manually-entered `client_id` (`auth: {method:'oauth', scope?, clientId?}`).
-- **Redirect — loopback** (не custom URL scheme): RFC-blessed для native-приложений, работает в dev и packaged, system browser через `shell.openExternal`, никогда in-app `BrowserWindow`.
-- Build-adjustments и deferred-items — `docs/milestone-1.5.md` → "Build adjustments" и `docs/m1-followups.md` → "M1.5 / OAuth follow-ups" (proactive-refresh-at-80%, OAuth-round-trips в inspector'е, hidden-then-surfaced client-id field, custom-URL-scheme redirect, RFC-7592 DCR-DELETE на sign-out).
+- **What the SDK does, what we do.** `@modelcontextprotocol/sdk` already implements (and tests) discovery (`.well-known/oauth-protected-resource` → `.well-known/oauth-authorization-server` (RFC 8414) → `openid-configuration`), PKCE (S256), the `auth()` orchestrator, DCR (RFC 7591), code exchange, refresh, and in the transports — try-token → refresh-on-401 → `redirectToAuthorization` + `UnauthorizedError`. We write: the implementation of the SDK's `OAuthClientProvider` interface (`packages/mcp-client/src/oauth.ts` — storage-agnostic, wired into the credential vault), a loopback redirect listener in main (`main/oauth/redirect.ts`, RFC 8252 §7.3 — one-shot `127.0.0.1:<ephemeral>/callback`), the glue in `ConnectionManager.connectOAuth` (`Connection.create({authProvider})` → has-token / `PendingAuthError`→`waitForCallback`→`finishAuth`→reconnect; a refresh-then-reject guard with max-1-retry; mid-session 401 → `auth-required`, no auto-retry; the cancellation pathway closes the listener immediately — no orphans), the wizard section (`oauth` radio + scope + a pre-registered client-id with a hint), sign-in/out UI + command-palette commands, and an e2e against the SDK demo server (`examples/server/simpleStreamableHttp.js --oauth`, headless via `MCPSTUDIO_OAUTH_AUTOAPPROVE`).
+- **Storage.** Tokens + DCR client info (+ `tokensSavedAt` for absolute expiry) — one encrypted JSON blob per profile in the credential vault (`schemaVersion` 1→2). The PKCE verifier — in-memory only. The renderer sees only a redacted status (`oauth:status` → signed-out/signed-in/expired + expiresAt + scope; `oauth:signOut`).
+- **DCR with a fallback.** DCR is used if the auth-server metadata contains `registration_endpoint`; otherwise — a manually-entered `client_id` (`auth: {method:'oauth', scope?, clientId?}`).
+- **Redirect — loopback** (not a custom URL scheme): RFC-blessed for native apps, works in dev and packaged, the system browser via `shell.openExternal`, never an in-app `BrowserWindow`.
+- Build adjustments and deferred items — `docs/milestone-1.5.md` → "Build adjustments" and `docs/m1-followups.md` → "M1.5 / OAuth follow-ups" (proactive-refresh-at-80%, OAuth round-trips in the inspector, the hidden-then-surfaced client-id field, a custom-URL-scheme redirect, RFC-7592 DCR-DELETE on sign-out).
 
 ### M2 — Niagara explorer + plugin architecture (2026-05-12, `v0.2.0-m2`)
 
-Server-specific plugins становятся реальностью: первый плагин — Niagara, read-only станционный браузер. План — `docs/milestone-2.md` (commits C33–C47, четыре фазы, check-in'ы на границах фаз). Read-only в M2 (write — M3, history viewer — M4, BearerResolver / `rotateMcpToken` — M3).
+Server-specific plugins become reality: the first plugin is Niagara, a read-only station browser. The plan — `docs/milestone-2.md` (commits C33–C47, four phases, check-ins at phase boundaries). Read-only in M2 (write — M3, history viewer — M4, BearerResolver / `rotateMcpToken` — M3).
 
-- **Plugin architecture.** `packages/plugin-api` — контракт: `Plugin` (manifest + views[] + optional `commands(ctx)` + optional `toolSchemaHints`), `PluginView` (id / title / icon / `component({ctx})`), `PluginContext` (bound connection + тонкие обёртки над IPC-каналами + `setCwd` для `{{cwd}}`), `PluginCommand`, `PluginManifest` (name / version / title / `matches: RegExp|string`) + `pluginManifestSchema` + `matchesServerName`. Build-time static import: renderer'ный `plugins/registry.ts` держит `IN_BOX_PLUGINS`, `pickPlugin(serverInfo)` матчит по `serverInfo.name`. Plugin views рендерятся хостом (`AppShell`'s `PluginViewHost` в `<Suspense>`), rail-айтемы + tab-лейблы — generic; plugin-команды вливаются в `useAppCommands`; `toolSchemaHints` мёрджатся в generic Tools-форму (`ToolsCatalog` → `pickPlugin` → `ToolInvocationDialog.mergeSchemaHint`). `packages/ui` — вынесенный вендоренный shadcn (Button / Input / Dialog / Command + `cn` + Tailwind-база), общий для `apps/desktop` и `plugins/niagara`. `{{cwd}}`-токен — `stores/templating.ts` (резолвится в tool-call-аргументах; плагинный view публикует свой «cwd» через `ctx.setCwd`).
-- **Niagara plugin** (`plugins/niagara`) — `matches: /^niagara/i` (подтверждено: `serverInfo.name === "niagaramcp"`), четыре lazy-вьюхи: **Explorer** (ленивое дерево слотов через `listChildren` per-node, React-Query-кэш; хлебные крошки; `Ctrl/Cmd+P` quick-nav по загруженным узлам), **Folder** (плоский сортируемый список детей Name/Type/ORD), **Properties** (`inspectComponent` identity + `getSlots` таблица слотов — display-only, edit = M3), **BQL** (CodeMirror 6 редактор; строит `<ord>|bql:`-префикс; `limit` — отдельный контрол; парсит TSV; история в localStorage). Type-aware иконки компонентов; `toolSchemaHints` с английскими `title`/`description`/`examples` поверх (частью русских) niagaramcp-схем.
-- **niagaramcp-кварки** (источник правды для обёрток + мок-сервера): результаты тулов несут JSON дважды (`structuredContent` + JSON-строка в `content[0].text`); `bqlQuery` отдаёт TSV в `content[0].text`; `getSlots`/`inspectComponent` отдают display-локализованные значения (`"поистине"` вместо `true`); ORD'ы — `station:|slot:/A/B/C`, `inspectComponent.parentOrd` приходит голым (`slot:/...`). Coordination-айтемы на стороне niagaramcp (track в `docs/m1-followups.md`, fix там): write-tool аннотации неверны (`readOnlyHint: true` / `destructiveHint: false` на create/update); `bqlQuery` input format hostile (требует полный ORD-префикс; SQL-style `LIMIT N` в строке запроса молча падает); описания тулов частью на русском. Релевантно M3.
-- **e2e** — `tests/fixtures/niagara-mock/server.mjs` (dependency-free stdio-MCP-сервер, реплеит записанные envelope'ы из `tests/fixtures/niagara-mock/*.json`) + `tests/e2e/niagara-plugin.spec.ts` (connect → badge → Explorer-дерево → Properties → BQL). e2e green ×3.
-- Build-adjustments — `docs/milestone-2.md` → "Adjustments during the M2 build" (включая три found-while-testing-фикса: `useConnections` seed из `connections:list`; `PluginContext.callTool` разворачивает `{result,error}`-обёртку; `@tanstack/react-query` + `react/jsx-runtime` в renderer'ный `resolve.dedupe` — иначе lazy-чанки плагина получают вторую React-Query-инстанцию в prod-сборке). Deferred — `docs/m2-followups.md` (tree virtualisation; links/extensions-панель в property sheet когда/если niagaramcp expose'ит read-тулы; host `ctx.openView` hook + per-node context menu; quick-nav как host-команда; slim CM6-чанк + dark editor theme + Lezer BQL-грамматика; per-connection explorer-state; deeper schema-merge).
+- **Plugin architecture.** `packages/plugin-api` — the contract: `Plugin` (manifest + views[] + optional `commands(ctx)` + optional `toolSchemaHints`), `PluginView` (id / title / icon / `component({ctx})`), `PluginContext` (the bound connection + thin wrappers over the IPC channels + `setCwd` for `{{cwd}}`), `PluginCommand`, `PluginManifest` (name / version / title / `matches: RegExp|string`) + `pluginManifestSchema` + `matchesServerName`. Build-time static import: the renderer's `plugins/registry.ts` holds `IN_BOX_PLUGINS`, `pickPlugin(serverInfo)` matches by `serverInfo.name`. Plugin views are rendered by the host (`AppShell`'s `PluginViewHost` in a `<Suspense>`), rail items + tab labels are generic; plugin commands are merged into `useAppCommands`; `toolSchemaHints` are merged into the generic Tools form (`ToolsCatalog` → `pickPlugin` → `ToolInvocationDialog.mergeSchemaHint`). `packages/ui` — the extracted vendored shadcn (Button / Input / Dialog / Command + `cn` + the Tailwind base), shared by `apps/desktop` and `plugins/niagara`. The `{{cwd}}` token — `stores/templating.ts` (resolved in tool-call arguments; a plugin view publishes its "cwd" via `ctx.setCwd`).
+- **Niagara plugin** (`plugins/niagara`) — `matches: /^niagara/i` (confirmed: `serverInfo.name === "niagaramcp"`), four lazy views: **Explorer** (a lazy slot tree via `listChildren` per-node, React-Query-cached; breadcrumbs; `Ctrl/Cmd+P` quick-nav over the loaded nodes), **Folder** (a flat sortable children list Name/Type/ORD), **Properties** (`inspectComponent` identity + a `getSlots` slot table — display-only, edit = M3), **BQL** (a CodeMirror 6 editor; builds the `<ord>|bql:` prefix; `limit` is a dedicated control; parses TSV; history in localStorage). Type-aware component icons; `toolSchemaHints` with English `title`/`description`/`examples` over niagaramcp's (partly Russian) schemas.
+- **niagaramcp quirks** (the source of truth for the wrappers + the mock server): tool results carry JSON twice (`structuredContent` + a JSON string in `content[0].text`); `bqlQuery` returns TSV in `content[0].text`; `getSlots`/`inspectComponent` return display-localized values (`"поистине"` instead of `true`); ORDs are `station:|slot:/A/B/C`, `inspectComponent.parentOrd` comes back bare (`slot:/...`). Coordination items on the niagaramcp side (tracked in `docs/m1-followups.md`, fixed there): write-tool annotations are wrong (`readOnlyHint: true` / `destructiveHint: false` on create/update); the `bqlQuery` input format is hostile (requires a full ORD prefix; an SQL-style `LIMIT N` in the query string silently fails); tool descriptions are partly in Russian. Relevant to M3.
+- **e2e** — `tests/fixtures/niagara-mock/server.mjs` (a dependency-free stdio MCP server that replays the recorded envelopes from `tests/fixtures/niagara-mock/*.json`) + `tests/e2e/niagara-plugin.spec.ts` (connect → badge → Explorer tree → Properties → BQL). e2e green ×3.
+- Build adjustments — `docs/milestone-2.md` → "Adjustments during the M2 build" (including the three found-while-testing fixes: `useConnections` seeding from `connections:list`; `PluginContext.callTool` unwrapping the `{result,error}` envelope; `@tanstack/react-query` + `react/jsx-runtime` added to the renderer's `resolve.dedupe` — otherwise the plugin's lazy chunks get a second React Query instance in the prod build). Deferred — `docs/m2-followups.md` (tree virtualisation; a links/extensions panel in the property sheet when/if niagaramcp exposes read tools; a host `ctx.openView` hook + a per-node context menu; quick-nav as a host command; slimming the CM6 chunk + a dark editor theme + a Lezer BQL grammar; per-connection explorer state; a deeper schema merge).
 
 ---
 
 ## Next step
 
-Передаёшь этот документ Claude Code как master spec для проекта. Первый промпт — «прочитай план, верни план реализации Milestone 1 разбитый на atomic commits с приёмочными критериями, плюс предлагаемая repo-структура с обоснованием отклонений от §11 если есть». Не лезем в код пока не пройдём через тот же recon + plan ритуал что и для niagaramcp.
+You hand this document to Claude Code as the project's master spec. The first prompt — "read the plan, return an implementation plan for Milestone 1 broken into atomic commits with acceptance criteria, plus a proposed repo structure with rationale for any deviations from §11". We don't touch code until we go through the same recon + plan ritual as for niagaramcp.
