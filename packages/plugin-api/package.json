@@ -1,0 +1,24 @@
+{
+  "name": "@mcp-studio/plugin-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The MCP Studio plugin contract: Plugin / PluginView / PluginContext / manifest.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "vitest": "^2.1.9"
+  }
+}
