@@ -1,0 +1,26 @@
+{
+  "name": "@mcp-studio/charts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Renderless-about-layout chart primitives — recharts wrappers + a downsampler. Shared by the Niagara plugin's history & monitor views, the host's tool-usage & performance views, and (forward-looking) the M5 AI co-pilot's chat-inline trend renderer.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "recharts": "^2.15.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "vitest": "^2.1.9"
+  }
+}
