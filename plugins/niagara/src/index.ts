@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Boxes, List, Network, Terminal } from 'lucide-react';
+import { Boxes, ClipboardList, List, Network, Terminal } from 'lucide-react';
 import type { Plugin } from '@mcp-studio/plugin-api';
 
 import { NIAGARA_MANIFEST } from './manifest';
@@ -14,8 +14,9 @@ const ExplorerView = lazy(() => import('./views/ExplorerView').then((m) => ({ de
 const FolderView = lazy(() => import('./views/FolderView').then((m) => ({ default: m.FolderView })));
 const PropertySheetView = lazy(() => import('./views/PropertySheetView').then((m) => ({ default: m.PropertySheetView })));
 const BqlView = lazy(() => import('./views/BqlView').then((m) => ({ default: m.BqlView })));
+const ChangesView = lazy(() => import('./views/ChangesView').then((m) => ({ default: m.ChangesView })));
 
-/** The in-box Niagara plugin: a read-only station browser, built out over C40–C45. */
+/** The in-box Niagara plugin: a station browser + (M3) write workflow. */
 export const niagaraPlugin: Plugin = {
   manifest: NIAGARA_MANIFEST,
   views: [
@@ -23,6 +24,7 @@ export const niagaraPlugin: Plugin = {
     { id: 'folder', title: 'Folder', icon: List, component: FolderView },
     { id: 'properties', title: 'Properties', icon: Boxes, component: PropertySheetView },
     { id: 'bql', title: 'BQL', icon: Terminal, component: BqlView },
+    { id: 'changes', title: 'Changes', icon: ClipboardList, component: ChangesView },
   ],
   toolSchemaHints: NIAGARA_TOOL_HINTS,
   toolAnnotationOverrides: NIAGARA_TOOL_ANNOTATION_OVERRIDES,
