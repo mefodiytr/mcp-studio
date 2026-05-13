@@ -17,6 +17,16 @@ const electronExecutable = path.join(
 // The in-process Niagara MCP mock — replays the recorded niagaramcp envelopes.
 const niagaraMock = path.join(repoRoot, 'tests', 'fixtures', 'niagara-mock', 'server.mjs');
 
+// Capture screenshots into docs/screenshots/ when MCPSTUDIO_E2E_SCREENSHOTS=1
+// is set — a no-op in normal CI / `pnpm test:e2e` so the suite is fast and
+// reproducible. Used by the docs/README capture pass.
+const SHOTS_ENABLED = process.env['MCPSTUDIO_E2E_SCREENSHOTS'] === '1';
+const SHOTS_DIR = path.join(repoRoot, 'docs', 'screenshots');
+const shot = async (page: Page, name: string): Promise<void> => {
+  if (!SHOTS_ENABLED) return;
+  await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`) });
+};
+
 let app: ElectronApplication;
 let win: Page;
 let userDataDir: string;
@@ -59,6 +69,7 @@ test('niagaramcp connection → Niagara plugin: explorer tree, property sheet, B
   await win.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(win.getByText(/\d+ tools · \d+ resources · \d+ prompts/i)).toBeVisible({ timeout: 20_000 });
   await expect(win.getByText(/Specialized by Niagara station/i)).toBeVisible({ timeout: 10_000 });
+  await shot(win, 'm3-niagara-connected');
 
   // Explorer view — the station root's children load immediately.
   await win.getByRole('button', { name: 'Explorer', exact: true }).click();
@@ -76,6 +87,7 @@ test('niagaramcp connection → Niagara plugin: explorer tree, property sheet, B
     .first()
     .click();
   await expect(tree.getByText('NiagaraNetwork', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await shot(win, 'm2-explorer-tree-expanded');
 
   // Select Drivers, then the Property sheet shows its identity.
   await tree.getByText('Drivers', { exact: true }).first().click();
@@ -87,4 +99,5 @@ test('niagaramcp connection → Niagara plugin: explorer tree, property sheet, B
   await win.getByRole('button', { name: 'Run', exact: true }).click();
   await expect(win.getByText('oat', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(win.getByText(/1 row/i)).toBeVisible();
+  await shot(win, 'm2-bql-result');
 });

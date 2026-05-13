@@ -19,6 +19,13 @@ const electronExecutable = path.join(
 // separate fixture.
 const niagaraMock = path.join(repoRoot, 'tests', 'fixtures', 'niagara-mock', 'server.mjs');
 
+const SHOTS_ENABLED = process.env['MCPSTUDIO_E2E_SCREENSHOTS'] === '1';
+const SHOTS_DIR = path.join(repoRoot, 'docs', 'screenshots');
+const shot = async (page: Page, name: string): Promise<void> => {
+  if (!SHOTS_ENABLED) return;
+  await page.screenshot({ path: path.join(SHOTS_DIR, `${name}.png`) });
+};
+
 let app: ElectronApplication;
 let win: Page;
 let userDataDir: string;
@@ -82,6 +89,7 @@ test('niagaramcp write flow: queue → diff → Apply → reads reflect mutation
   // The integer slot `maxBadLoginsBeforeLockOut` (BSimple — editable).
   const row = win.locator('tr', { hasText: 'maxBadLoginsBeforeLockOut' });
   await expect(row).toBeVisible({ timeout: 15_000 });
+  await shot(win, 'm3-property-sheet');
   const slotInput = row.locator('input').first();
   await slotInput.fill('7');
   await slotInput.press('Enter');
@@ -93,11 +101,13 @@ test('niagaramcp write flow: queue → diff → Apply → reads reflect mutation
   await expect(win.getByText(/2 pending changes/i)).toBeVisible();
   // Both ops are reversible (CreateComponent + SetSlot per the §D2 table).
   await expect(win.getByText('Reversible')).toHaveCount(2);
+  await shot(win, 'm3-changes-view-with-pending');
   // Apply → confirm → all-reversible path of the dialog.
   await win.getByRole('button', { name: 'Apply all', exact: true }).click();
   const confirm = win.getByRole('dialog');
   await expect(confirm.getByText(/Apply 2 operations\?/i)).toBeVisible();
   await expect(confirm.getByText(/reversible/i)).toBeVisible();
+  await shot(win, 'm3-apply-confirm-dialog');
   await confirm.getByRole('button', { name: 'Apply', exact: true }).click();
   // Both rows should now read "done".
   await expect(win.getByText('done')).toHaveCount(2, { timeout: 15_000 });
@@ -131,4 +141,5 @@ test('niagaramcp write flow: queue → diff → Apply → reads reflect mutation
   await expect(win.getByText('setSlot', { exact: true })).toBeVisible();
   await expect(win.getByText('createComponent', { exact: true })).toBeVisible();
   await expect(win.getByText('commitStation', { exact: true })).toBeVisible();
+  await shot(win, 'm3-history-writes-filter');
 });

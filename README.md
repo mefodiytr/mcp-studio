@@ -16,7 +16,23 @@ A universal MCP (Model Context Protocol) desktop client with a plugin host — a
 
 ## Screenshots
 
-> **TODO** — the M2 Explorer / BQL screenshots are not yet captured. `docs/screenshots/` has the M1-era app-shell shots; the M2 views need a Playwright-driven multi-state capture script (the [`tests/e2e/niagara-plugin.spec.ts`](tests/e2e/niagara-plugin.spec.ts) flow is the natural basis — it already drives the Explorer/Properties/BQL states; add `page.screenshot()` calls or factor it into `tools/capture-screenshots.mjs`). The single-shot `MCPSTUDIO_CAPTURE_PATH` main-process hook only captures the idle workspace.
+**Niagara station explorer** (M2) — the slot tree expanded under `Drivers`, with per-row type badges and the plugin's rail items (Explorer / Folder / Properties / BQL / Changes):
+
+![Explorer tree expanded](docs/screenshots/m2-explorer-tree-expanded.png)
+
+**Diff-and-approve write workflow** (M3) — two pending ops in the Changes view, both badged **Reversible**:
+
+![Changes view with pending ops](docs/screenshots/m3-changes-view-with-pending.png)
+
+**Apply confirm dialog** (M3) — explicit reversibility callout; an all-irreversible Apply gets a destructive-styled button with the "Including K irreversible — Niagara has no native undo" warning:
+
+![Apply confirm dialog](docs/screenshots/m3-apply-confirm-dialog.png)
+
+**Audit trail** (M3) — the History panel with the "Writes only" filter on, showing the `setSlot` / `createComponent` / `commitStation` triple from a single Apply pass, each `write`-flagged and attributed to the connection profile:
+
+![History panel — writes only](docs/screenshots/m3-history-writes-filter.png)
+
+More in [`docs/screenshots/`](docs/screenshots/) (Property sheet, BQL result, the fresh-connection card with the "Specialized by Niagara station" badge, and the M1 app-shell history). The M2 + M3 shots are captured by the Playwright e2e specs themselves — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the `MCPSTUDIO_E2E_SCREENSHOTS=1` capture pass.
 
 ## Quick start
 
