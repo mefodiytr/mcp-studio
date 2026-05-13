@@ -134,6 +134,40 @@ export async function bqlQuery(
   return { ...parseTsv(raw), raw };
 }
 
+/** A `removeComponent` dry-run preview — what would happen if the operator
+ *  hit Apply. Used by the tree's "Remove…" dialog (C56) so the operator sees
+ *  inbound-link refusals etc. *before* the op enters the pending queue. */
+export interface RemovalPreview {
+  ord: string;
+  /** True when niagaramcp would refuse this removal (typically: inbound links
+   *  exist and `force` wasn't set). When refused, `message` carries the reason. */
+  refused: boolean;
+  /** Free-text reason / summary for display. */
+  message: string;
+  /** Inbound link ords that block the removal, if niagaramcp lists them. */
+  inboundLinks: string[];
+  /** The raw structuredContent of the dry-run response, for "show raw" in the UI. */
+  raw: unknown;
+}
+
+/** Fetch a `removeComponent(dryRun:true)` preview without queueing the op.
+ *  Throws on transport / `isError` per the M2 unwrap convention; the resulting
+ *  preview is *not* persisted to the audit trail (this is a read-style call —
+ *  no `{write:true}` opt). The C56 remove dialog renders this then either
+ *  enqueues a `RemoveComponent` op or asks for `force` and re-previews. */
+export async function dryRunRemove(
+  ctx: PluginContext,
+  ord: string,
+  force = false,
+): Promise<RemovalPreview> {
+  const result = await ctx.callTool('removeComponent', { ord, dryRun: true, ...(force ? { force: true } : {}) });
+  const p = payload(result);
+  const refused = bool(p['refused']) || (p['wouldRemove'] === false);
+  const inbound = Array.isArray(p['inboundLinks']) ? p['inboundLinks'].filter((x): x is string => typeof x === 'string') : [];
+  const message = str(p['message']) || textContent(result) || (refused ? 'Removal refused by the station.' : 'Would remove.');
+  return { ord: str(p['ord']) || ord, refused, message, inboundLinks: inbound, raw: p };
+}
+
 export async function getSlots(ctx: PluginContext, ord: string): Promise<SlotRow[]> {
   const slots = payload(await ctx.callTool('getSlots', { ord }))['slots'];
   if (!Array.isArray(slots)) return [];

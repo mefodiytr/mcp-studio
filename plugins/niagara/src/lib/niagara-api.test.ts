@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
-import { getSlots, inspectComponent, listChildren, payload, textContent } from './niagara-api';
+import { dryRunRemove, getSlots, inspectComponent, listChildren, payload, textContent } from './niagara-api';
 
 describe('payload', () => {
   it('prefers structuredContent', () => {
@@ -114,5 +114,49 @@ describe('getSlots', () => {
 
   it('returns [] when there is no slots array', async () => {
     expect(await getSlots(fakeCtx(async () => ({ structuredContent: { ord: 'x' } })), 'x')).toEqual([]);
+  });
+});
+
+describe('dryRunRemove', () => {
+  it('sends ord + dryRun:true (and force when asked), without the {write:true} opt', async () => {
+    const seen: { name: string; args?: Record<string, unknown>; opts?: { write?: boolean } }[] = [];
+    const ctx = fakeCtx(async (name, args, opts) => {
+      seen.push({ name, args, opts });
+      return { structuredContent: { ord: args?.['ord'], wouldRemove: true, inboundLinks: [], message: 'OK' } };
+    });
+    await dryRunRemove(ctx, 'station:|slot:/Drivers/Old');
+    expect(seen[0]).toEqual({
+      name: 'removeComponent',
+      args: { ord: 'station:|slot:/Drivers/Old', dryRun: true },
+      opts: undefined,
+    });
+    await dryRunRemove(ctx, 'station:|slot:/Drivers/Old', true);
+    expect(seen[1]?.args).toEqual({ ord: 'station:|slot:/Drivers/Old', dryRun: true, force: true });
+  });
+
+  it('flags refused when wouldRemove is false, and collects inbound link ords', async () => {
+    const ctx = fakeCtx(async () => ({
+      structuredContent: {
+        ord: 'station:|slot:/Drivers/Net',
+        wouldRemove: false,
+        inboundLinks: ['station:|slot:/Logic/A/out', 'station:|slot:/Logic/B/out'],
+        message: 'inbound links exist',
+      },
+    }));
+    const preview = await dryRunRemove(ctx, 'station:|slot:/Drivers/Net');
+    expect(preview).toMatchObject({
+      ord: 'station:|slot:/Drivers/Net',
+      refused: true,
+      message: 'inbound links exist',
+      inboundLinks: ['station:|slot:/Logic/A/out', 'station:|slot:/Logic/B/out'],
+    });
+  });
+
+  it('also recognises an explicit refused:true flag, and falls back to a sane default message', async () => {
+    const ctx = fakeCtx(async () => ({ structuredContent: { refused: true } }));
+    const preview = await dryRunRemove(ctx, 'x');
+    expect(preview.refused).toBe(true);
+    expect(preview.message).toBe('Removal refused by the station.');
+    expect(preview.inboundLinks).toEqual([]);
   });
 });
