@@ -42,6 +42,7 @@ const VIEW_KEYS: { view: AppView; navKey: string }[] = [
   { view: 'resources', navKey: 'resources' },
   { view: 'prompts', navKey: 'prompts' },
   { view: 'history', navKey: 'history' },
+  { view: 'usage', navKey: 'usage' },
   { view: 'raw', navKey: 'raw' },
 ];
 

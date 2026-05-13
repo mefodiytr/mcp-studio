@@ -35,6 +35,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@mcp-studio/charts':
+        specifier: workspace:*
+        version: link:../../packages/charts
       '@mcp-studio/mcp-client':
         specifier: workspace:*
         version: link:../../packages/mcp-client

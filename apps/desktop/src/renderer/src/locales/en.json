@@ -7,6 +7,7 @@
     "servers": "Servers",
     "tools": "Tools",
     "history": "History",
+    "usage": "Tool usage",
     "raw": "Raw JSON-RPC",
     "resources": "Resources",
     "prompts": "Prompts",
@@ -25,6 +26,7 @@
     "resources": "Resources",
     "prompts": "Prompts",
     "history": "History",
+    "usage": "Tool usage",
     "raw": "Raw JSON-RPC",
     "newTab": "New tab",
     "close": "Close tab",
@@ -221,6 +223,22 @@
     "writesOnly": "Writes only",
     "writeBadge": "write",
     "export": "Export audit log"
+  },
+  "usage": {
+    "title": "Tool usage",
+    "empty": "No tool calls yet — invoke a tool from the Tools catalog to see stats here.",
+    "noConnection": "Connect a server to see tool-usage stats.",
+    "scopeAll": "All connections",
+    "writesOnly": "Writes only",
+    "mostCalled": "Most-called tools",
+    "latency": "Per-tool latency",
+    "errors": "Error breakdown",
+    "noErrors": "No errors in the visible history.",
+    "calls": "calls",
+    "avg": "avg",
+    "p50": "p50",
+    "p95": "p95",
+    "tool": "Tool"
   },
   "raw": {
     "title": "Raw JSON-RPC",

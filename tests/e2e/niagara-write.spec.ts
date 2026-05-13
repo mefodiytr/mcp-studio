@@ -142,4 +142,14 @@ test('niagaramcp write flow: queue → diff → Apply → reads reflect mutation
   await expect(win.getByText('createComponent', { exact: true })).toBeVisible();
   await expect(win.getByText('commitStation', { exact: true })).toBeVisible();
   await shot(win, 'm3-history-writes-filter');
+
+  // === 6) Tool-usage view (M4 C63) — derived stats over the same history ===
+  await win.keyboard.press('Control+k');
+  await palette.fill('Tool usage');
+  await palette.press('Enter');
+  await expect(win.getByRole('heading', { name: 'Tool usage' })).toBeVisible();
+  // The same three writes feed the most-called bars and the latency table.
+  await expect(win.getByText('Most-called tools')).toBeVisible();
+  await expect(win.getByText('Per-tool latency')).toBeVisible();
+  await shot(win, 'm4-usage');
 });

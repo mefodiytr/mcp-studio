@@ -17,6 +17,7 @@
     "typecheck": "pnpm typecheck:node && pnpm typecheck:web"
   },
   "dependencies": {
+    "@mcp-studio/charts": "workspace:*",
     "@mcp-studio/mcp-client": "workspace:*",
     "@mcp-studio/niagara": "workspace:*",
     "@mcp-studio/plugin-api": "workspace:*",
