@@ -196,6 +196,75 @@ function typeofToBajaType(value) {
   return 'baja:String';
 }
 
+// ── readPoint + readHistory (M4) — canned deterministic sine over wall clock
+// so the live monitor's sparkline ticks across polls + the History view's
+// chart renders a stable, recognisable shape. The base offset per ord makes
+// adjacent watches distinguishable.
+
+function ordHash(ord) {
+  let h = 0;
+  for (let i = 0; i < ord.length; i++) h = (h * 31 + ord.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function sineAt(ord, tMs) {
+  const offset = (ordHash(ord) % 40) - 5; // ~-5..35
+  const slow = Math.sin(tMs / 3_600_000) * 8; // ~hour-scale wave
+  const fast = Math.sin(tMs / 300_000) * 2; // ~5-min wave
+  return Number((offset + slow + fast).toFixed(2));
+}
+
+function readPoint(args) {
+  const ord = String(args?.ord ?? '');
+  if (!ord) return toolError('ord is required');
+  const node = nodes.get(ord);
+  const v = sineAt(ord, Date.now());
+  return ok({
+    ord,
+    displayName: node?.displayName ?? leafOf(ord),
+    type: node?.type ?? 'control:NumericPoint',
+    value: v,
+    out: `${v} {ok} @ def`,
+    status: 'ok',
+    facets: { units: '°C', precision: 2 },
+  });
+}
+
+function parseTime(value, fallback) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+  if (typeof value === 'string') {
+    if (/^\d+$/.test(value)) return Number(value);
+    const t = Date.parse(value);
+    return Number.isFinite(t) ? t : fallback;
+  }
+  return fallback;
+}
+
+function readHistory(args) {
+  const ord = String(args?.ord ?? '');
+  if (!ord) return toolError('ord is required');
+  const now = Date.now();
+  const from = parseTime(args?.from, now - 3_600_000);
+  const to = parseTime(args?.to, now);
+  if (!(to > from)) return ok({ ord, records: [], truncated: false });
+  const limit = Number.isFinite(args?.limit) ? Math.max(1, Math.min(10_000, Number(args.limit))) : 1000;
+  const span = to - from;
+  // ~1 sample/minute up to the limit.
+  const n = Math.max(2, Math.min(limit, Math.floor(span / 60_000) + 1));
+  const step = span / (n - 1);
+  const records = [];
+  for (let i = 0; i < n; i++) {
+    const t = Math.round(from + i * step);
+    records.push({ t: new Date(t).toISOString(), v: sineAt(ord, t) });
+  }
+  // Aggregation: client-side per niagaramcp's contract — the mock just echoes
+  // the requested mode so the wrapper can pass it through; "none" is the same
+  // dataset, the others scale the value by a tiny tag so the renderer can
+  // visually distinguish the aggregation toggled.
+  const agg = String(args?.aggregation ?? 'none');
+  return ok({ ord, records, aggregation: agg, truncated: false, rowCount: records.length });
+}
+
 function createComponent(args) {
   if (shouldFail(args)) return toolError('fault-injected: __fail in args');
   const parentOrd = String(args?.parentOrd ?? '');
@@ -352,6 +421,10 @@ function callTool(params) {
       return commitStation();
     case 'setupTestUser':
       return setupTestUser(params.arguments);
+    case 'readPoint':
+      return readPoint(params.arguments);
+    case 'readHistory':
+      return readHistory(params.arguments);
     default:
       return { isError: false, content: [{ type: 'text', text: `(niagara-mock has no handler for ${params?.name})` }] };
   }

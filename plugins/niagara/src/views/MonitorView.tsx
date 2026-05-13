@@ -151,14 +151,19 @@ function WatchRow({
     staleTime: 0,
   });
 
+  // Key the effect on `dataUpdatedAt` (React Query's timestamp of the latest
+  // successful fetch) so a poll that returns the same value still appends a
+  // sample — keying on `q.data` alone misses identical-reference ticks and
+  // the sparkline never grows past one point on a flat signal.
+  const dataUpdatedAt = q.dataUpdatedAt;
+  const value = q.data?.value ?? null;
   useEffect(() => {
-    if (!q.data) return;
-    const next: TimeSeriesPoint = { t: Date.now(), v: q.data.value };
+    if (dataUpdatedAt === 0) return;
     setBuffer((prev) => {
-      const grown = [...prev, next];
+      const grown = [...prev, { t: dataUpdatedAt, v: value }];
       return grown.length > BUFFER_SIZE ? grown.slice(grown.length - BUFFER_SIZE) : grown;
     });
-  }, [q.data]);
+  }, [dataUpdatedAt, value]);
 
   const reading = q.data;
   const currentValue = reading?.value ?? null;
