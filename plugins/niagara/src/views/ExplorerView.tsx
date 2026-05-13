@@ -148,6 +148,16 @@ function TreeNode({
           e.preventDefault();
           onMenu({ node, x: e.clientX, y: e.clientY });
         }}
+        // Drag-source for the M4 live monitor — drop on the Monitor view's
+        // body to add the row to the watch list. The MIME mirrors the host's
+        // niagara plugin scope so a future host-level drop zone (the Watch
+        // app-view, if extracted) can register the same type.
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('application/x-niagara-ord', node.ord);
+          e.dataTransfer.setData('text/plain', node.ord);
+          e.dataTransfer.effectAllowed = 'copy';
+        }}
         title={node.ord}
         className={cn(
           'flex cursor-pointer items-center gap-1 rounded px-1 py-0.5 hover:bg-accent',

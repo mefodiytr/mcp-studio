@@ -110,6 +110,55 @@ export async function inspectComponent(ctx: PluginContext, ord: string): Promise
   };
 }
 
+/** A point reading — what the live monitor polls every K seconds. */
+export interface PointReading {
+  ord: string;
+  displayName: string;
+  /** Numeric value parsed from the response; `null` when the server returned
+   *  a non-numeric string (e.g. a fault status) — the sparkline renders a gap. */
+  value: number | null;
+  /** The raw `out` string niagaramcp returns (e.g. `"21.5 {ok} @ def"`); useful
+   *  for display alongside the parsed numeric. */
+  out: string;
+  /** Niagara status string (`ok` / `fault` / `down` / `disabled` / …). */
+  status: string;
+  /** Niagara type, e.g. `control:NumericPoint`. */
+  type: string;
+  /** Optional facets — `units`, `precision`, etc. — when the server includes them. */
+  facets?: Record<string, unknown>;
+}
+
+/** Read a single point's current value + status (the monitor's per-row poll
+ *  + an ad-hoc lookup elsewhere). Throws on transport / `isError` per the M2
+ *  unwrap convention. Defensive about both `structuredContent` and parsed
+ *  `content[0].text` shapes; numeric values are coerced from strings when
+ *  the response stringifies them. */
+export async function readPoint(ctx: PluginContext, ord: string): Promise<PointReading> {
+  const p = payload(await ctx.callTool('readPoint', { ord }));
+  const facetsRaw = p['facets'];
+  return {
+    ord: str(p['ord']) || ord,
+    displayName: str(p['displayName']) || ordLeaf(ord),
+    value: parseNumeric(p['value']),
+    out: str(p['out']) || str(p['value']),
+    status: str(p['status']),
+    type: str(p['type']),
+    facets: facetsRaw && typeof facetsRaw === 'object' && !Array.isArray(facetsRaw) ? (facetsRaw as Record<string, unknown>) : undefined,
+  };
+}
+
+function parseNumeric(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (typeof value === 'string') {
+    const m = value.match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 /** One property slot of a component (`getSlots`). */
 export interface SlotRow {
   name: string;
