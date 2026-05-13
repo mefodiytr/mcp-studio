@@ -1,6 +1,6 @@
 import { describe as descBlock, expect, it } from 'vitest';
 
-import { describe, isReversible, toToolCall, type WriteOp } from './write-ops';
+import { bsimpleKind, describe, isReversible, parseBSimpleValue, toToolCall, type WriteOp } from './write-ops';
 
 const ops: Record<WriteOp['type'], WriteOp> = {
   setSlot: { type: 'setSlot', ord: 'station:|slot:/Logic/Reg1', slotName: 'out', oldValue: 1, newValue: 42 },
@@ -70,6 +70,51 @@ descBlock('describe', () => {
       }),
     ).toBe('Link station:|slot:/Logic/A.out → station:|slot:/Logic/B.in');
     expect(describe(ops.unlinkSlots)).toBe('Unlink In16 on station:|slot:/Logic/B');
+  });
+});
+
+descBlock('bsimpleKind', () => {
+  it('maps the BSimple Property slot types to an editable kind', () => {
+    expect(bsimpleKind('baja:String')).toBe('string');
+    expect(bsimpleKind('baja:Boolean')).toBe('boolean');
+    expect(bsimpleKind('baja:Integer')).toBe('integer');
+    expect(bsimpleKind('baja:Long')).toBe('integer');
+    expect(bsimpleKind('baja:Double')).toBe('number');
+    expect(bsimpleKind('baja:Float')).toBe('number');
+  });
+  it('returns null for complex / non-BSimple slot types (read-only in M3)', () => {
+    expect(bsimpleKind('baja:RelTime')).toBeNull();
+    expect(bsimpleKind('baja:StatusNumeric')).toBeNull();
+    expect(bsimpleKind('history:NumericIntervalExt')).toBeNull();
+    expect(bsimpleKind('')).toBeNull();
+  });
+});
+
+descBlock('parseBSimpleValue', () => {
+  it('strings come through as-is (no trim — strings are values, not commands)', () => {
+    expect(parseBSimpleValue('string', '  hello  ')).toBe('  hello  ');
+    expect(parseBSimpleValue('string', '')).toBe('');
+  });
+  it('integers parse from a digit-only string; otherwise undefined', () => {
+    expect(parseBSimpleValue('integer', '42')).toBe(42);
+    expect(parseBSimpleValue('integer', '-7')).toBe(-7);
+    expect(parseBSimpleValue('integer', '3.14')).toBeUndefined();
+    expect(parseBSimpleValue('integer', 'abc')).toBeUndefined();
+  });
+  it('numbers accept ints and floats; reject NaN', () => {
+    expect(parseBSimpleValue('number', '3.14')).toBe(3.14);
+    expect(parseBSimpleValue('number', '0')).toBe(0);
+    expect(parseBSimpleValue('number', 'nan')).toBeUndefined();
+  });
+  it('booleans parse true/false plus niagaramcp\'s localized поистине/ложь', () => {
+    expect(parseBSimpleValue('boolean', 'true')).toBe(true);
+    expect(parseBSimpleValue('boolean', 'TRUE')).toBe(true);
+    expect(parseBSimpleValue('boolean', 'поистине')).toBe(true);
+    expect(parseBSimpleValue('boolean', '1')).toBe(true);
+    expect(parseBSimpleValue('boolean', 'false')).toBe(false);
+    expect(parseBSimpleValue('boolean', 'ложь')).toBe(false);
+    expect(parseBSimpleValue('boolean', '0')).toBe(false);
+    expect(parseBSimpleValue('boolean', 'wat')).toBeUndefined();
   });
 });
 

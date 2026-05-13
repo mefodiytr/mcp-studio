@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, CircleAlert, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
 import {
   Button,
@@ -31,6 +32,7 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
   const setAutoCommit = usePendingStore((s) => s.setAutoCommit);
   const applyAll = usePendingStore((s) => s.applyAll);
 
+  const queryClient = useQueryClient();
   const [applying, setApplying] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -43,6 +45,10 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
     setApplying(true);
     try {
       await applyAll(cid, ctx);
+      // Refresh anything Niagara fetched for this connection — slot tables,
+      // listChildren, inspectComponent — so the property sheet / explorer
+      // see the new state without a tab switch.
+      await queryClient.invalidateQueries({ queryKey: ['niagara', cid] });
     } finally {
       setApplying(false);
     }

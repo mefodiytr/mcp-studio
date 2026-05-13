@@ -140,7 +140,13 @@ export const usePendingStore = create<PendingState>((set, get) => ({
   },
 }));
 
-/** Selector helper: the current queue for a connection (or an empty array). */
+// A single shared reference for "no queue" — returning a fresh `[]` per render
+// would make Zustand's `Object.is` selector compare see a change every render
+// and loop the consumer (React #185).
+const EMPTY_QUEUE: readonly QueuedOp[] = [];
+
+/** Selector helper: the current queue for a connection (or a stable empty array). */
 export function selectQueue(connectionId: string | undefined) {
-  return (s: PendingState): readonly QueuedOp[] => (connectionId ? (s.queues.get(connectionId) ?? []) : []);
+  return (s: PendingState): readonly QueuedOp[] =>
+    connectionId ? (s.queues.get(connectionId) ?? EMPTY_QUEUE) : EMPTY_QUEUE;
 }

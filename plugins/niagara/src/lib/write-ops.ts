@@ -80,6 +80,52 @@ function formatValue(v: unknown): string {
   return String(v);
 }
 
+/** A BSimple Property-slot kind that `setSlot` accepts and that the property
+ *  sheet can render an editable cell for. `null` = not BSimple (read-only in
+ *  M3 — Actions, complex BStruct slots, links and extensions are out of scope;
+ *  see `docs/milestone-3.md` §D5). */
+export type BSimpleKind = 'string' | 'boolean' | 'integer' | 'number' | null;
+
+const BSIMPLE_KIND: Record<string, Exclude<BSimpleKind, null>> = {
+  'baja:String': 'string',
+  'baja:Boolean': 'boolean',
+  'baja:Integer': 'integer',
+  'baja:Long': 'integer',
+  'baja:Double': 'number',
+  'baja:Float': 'number',
+};
+
+export function bsimpleKind(slotType: string): BSimpleKind {
+  return BSIMPLE_KIND[slotType] ?? null;
+}
+
+/** Parse the display string a niagaramcp `getSlots` returns into the JS value
+ *  setSlot expects — best-effort, returns the original string for `string`
+ *  kinds, parses integers / numbers, and handles boolean (`true`/`false` plus
+ *  the Russian-localized `поистине`/`ложь` niagaramcp currently ships in lieu
+ *  of canonical booleans). Returns `undefined` when parsing fails. */
+export function parseBSimpleValue(kind: Exclude<BSimpleKind, null>, raw: string): unknown {
+  const v = raw.trim();
+  switch (kind) {
+    case 'string':
+      return raw;
+    case 'integer': {
+      if (!/^-?\d+$/.test(v)) return undefined;
+      return Number.parseInt(v, 10);
+    }
+    case 'number': {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    case 'boolean': {
+      const lo = v.toLowerCase();
+      if (lo === 'true' || lo === 'поистине' || lo === '1') return true;
+      if (lo === 'false' || lo === 'ложь' || lo === '0') return false;
+      return undefined;
+    }
+  }
+}
+
 /** The `{name, arguments}` pair to pass to `ctx.callTool` — exactly the shape
  *  niagaramcp's `tools/list` advertises for each tool. */
 export function toToolCall(op: WriteOp): { name: string; arguments: Record<string, unknown> } {
