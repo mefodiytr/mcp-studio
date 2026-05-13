@@ -40,5 +40,10 @@ Thumbs.db
 # Local-only
 *.local
 
+# Local working drafts at the repo root (Russian notes, staged AI prompts, etc.)
+/промт*.md
+/draft*.md
+/notes-*.md
+
 # electron-builder
 builder-debug.yml
