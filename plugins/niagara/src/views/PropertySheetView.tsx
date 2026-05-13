@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Boxes, RotateCcw } from 'lucide-react';
 import { Button, cn } from '@mcp-studio/ui';
@@ -291,14 +291,19 @@ function TextEditableCell({
 }) {
   const [draft, setDraft] = useState(slot.value);
   const [error, setError] = useState<string | null>(null);
+  // The last draft we successfully enqueued — so Enter + blur don't double-fire
+  // (the displayed slot.value hasn't refreshed yet, so we can't compare to it).
+  const lastSentRef = useRef<string>(slot.value);
   useEffect(() => {
     setDraft(slot.value);
     setError(null);
+    lastSentRef.current = slot.value;
   }, [slot.value, slot.name]);
 
   const tryCommit = (): void => {
-    if (draft === slot.value) return; // no-op
+    if (draft === lastSentRef.current) return; // no-op
     if (kind === 'string') {
+      lastSentRef.current = draft;
       void onCommit(draft);
       return;
     }
@@ -308,6 +313,7 @@ function TextEditableCell({
       return;
     }
     setError(null);
+    lastSentRef.current = draft;
     void onCommit(parsed);
   };
 
