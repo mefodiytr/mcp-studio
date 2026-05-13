@@ -2,7 +2,7 @@
 
 A universal MCP (Model Context Protocol) desktop client with a plugin host — and a Niagara/BMS station browser as the first specialized plugin. *What Workbench is to Niagara, MCP Studio aims to be to MCP servers.*
 
-**Version `v0.2.0-m2`** · M1 ✅ · M1.5 ✅ · M2 ✅ · M3 ⏳ · Proprietary — all rights reserved · Windows / macOS / Linux (unsigned builds only)
+**Version `v0.3.0-m3`** · M1 ✅ · M1.5 ✅ · M2 ✅ · M3 ✅ · M4 ⏳ · Proprietary — all rights reserved · Windows / macOS / Linux (unsigned builds only)
 
 ---
 
@@ -90,15 +90,16 @@ pnpm test:e2e                                   # builds, then runs the Playwrig
 pnpm lint && pnpm typecheck                     # eslint + tsc --noEmit, every package
 ```
 
-Currently **142 unit tests** (plugin-api / schema-form / mcp-client / niagara / desktop) and **3 e2e specs**, each against a real flow: `@modelcontextprotocol/server-everything` over stdio, the SDK's OAuth demo server, and the in-process niagaramcp fixture mock (`tests/fixtures/niagara-mock/server.mjs`). Coverage gates: `schema-form` ≥90; `mcp-client` a regression floor that only goes up (master-spec §13 — the ratchet policy applies to every package as tests accrue). CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → e2e on every push/PR; `package.yml` builds unsigned artifacts on `v*` tags.
+Currently **178 unit tests** (plugin-api / schema-form / mcp-client / niagara / desktop) and **4 e2e specs**, each against a real flow: `@modelcontextprotocol/server-everything` over stdio, the SDK's OAuth demo server, and the in-process niagaramcp fixture mock (`tests/fixtures/niagara-mock/server.mjs` — stateful since M3) for both a read flow and a write flow. Coverage gates: `schema-form` ≥90; `mcp-client` a regression floor that only goes up (master-spec §13 — the ratchet policy applies to every package as tests accrue). CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → e2e on every push/PR; `package.yml` builds unsigned artifacts on `v*` tags.
 
 ## Roadmap
 
 - **M1** (`v0.1.0-m1`) — universal client foundation: HTTP/stdio transports, Bearer/header/none auth, tools/resources/prompts, the protocol inspector, command palette, multi-tab workspace, raw console.
 - **M1.5** (`v0.1.5-m1.5`) — OAuth 2.1 + PKCE (discovery, DCR, loopback redirect, refresh) as a third auth method.
 - **M2** (`v0.2.0-m2`) — plugin architecture (`plugin-api`, `packages/ui`, the registry, the extensible command registry, the `{{cwd}}` token) + the read-only Niagara explorer (tree, folder, property sheet, quick-nav, BQL playground, type-aware icons, tool-schema hints).
-- **M3** (next) — write tools, the destructive-action confirm path leaning on tool annotations, the property-sheet inline-edit affordance, and the `BearerResolver` / `mcp:tokenHash` / `rotateMcpToken` user-context flow for Niagara writes.
-- **M4+** (sketched) — history viewer, better-sqlite3 store, live monitor, plugin marketplace for non-Niagara servers, an AI co-pilot, code signing/notarization.
+- **M3** (`v0.3.0-m3`) — write & safety: `Plugin.toolAnnotationOverrides` + the renderer's single-resolution-point overlay (the niagara map corrects niagaramcp's wrongly-annotated `walkthrough-write` family); an audit trail (write-flagged `tool-history` + "Writes only" filter + JSON export); the Niagara write engine — per-connection diff-and-approve queue (`changes` view, reversibility-flagged ops, irreversible-call-out on Apply, optimistic property-sheet pending state, dry-run preview on remove) + the tree's right-click create/remove/extend/link menu + the feature-detected user-context Bearer bootstrap (`setupTestUser` today, `provisionMcpUser`/`rotateMcpToken` later with no code change).
+- **M4** (next) — observability: live monitor (watch list + charts), history viewer (`readHistory` + range picker + chart/table dual view), performance timeline, tool-usage stats.
+- **M5+** (sketched) — macros & automation, AI co-pilot, compare & sync, plugin marketplace for non-Niagara servers, polish & code signing.
 
 Full plans: [`docs/milestone-1.md`](docs/milestone-1.md) · [`docs/milestone-1.5.md`](docs/milestone-1.5.md) · [`docs/milestone-2.md`](docs/milestone-2.md) (each with an "Adjustments during the build" section). Index: [`docs/README.md`](docs/README.md).
 
