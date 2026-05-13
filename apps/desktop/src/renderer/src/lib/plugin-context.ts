@@ -45,7 +45,7 @@ export function buildPluginContext(
       serverInfo: connection.serverInfo,
       status: connection.status,
     },
-    callTool: async (name, args) => unwrapToolCall(await callTool(id, name, args)),
+    callTool: async (name, args, opts) => unwrapToolCall(await callTool(id, name, args, opts)),
     listTools: () => fetchTools(id),
     listResources: () => fetchResources(id),
     listResourceTemplates: () => fetchResourceTemplates(id),

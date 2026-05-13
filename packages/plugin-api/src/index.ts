@@ -48,7 +48,14 @@ export interface PluginConnection {
  *  templating-`cwd` publisher. */
 export interface PluginContext {
   readonly connection: PluginConnection;
-  callTool(name: string, args?: Record<string, unknown>): Promise<unknown>;
+  /** Invoke a tool. `opts.write` flags the call as a mutation for the audit
+   *  trail — pass it from write-tool wrappers (the host's destructive-confirm
+   *  + the History "writes only" filter both lean on it). */
+  callTool(
+    name: string,
+    args?: Record<string, unknown>,
+    opts?: { write?: boolean },
+  ): Promise<unknown>;
   listTools(): Promise<unknown[]>;
   listResources(): Promise<unknown[]>;
   listResourceTemplates(): Promise<unknown[]>;
