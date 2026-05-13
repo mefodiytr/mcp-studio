@@ -3,6 +3,7 @@ import {
   BarChart3,
   Braces,
   Files,
+  Gauge,
   History,
   MessageSquare,
   Monitor,
@@ -21,7 +22,7 @@ import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-export type AppView = 'connections' | 'tools' | 'resources' | 'prompts' | 'history' | 'raw' | 'usage';
+export type AppView = 'connections' | 'tools' | 'resources' | 'prompts' | 'history' | 'raw' | 'usage' | 'perf';
 
 const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'servers', Icon: Server, view: 'connections' },
@@ -30,6 +31,7 @@ const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'prompts', Icon: MessageSquare, view: 'prompts' },
   { key: 'history', Icon: History, view: 'history' },
   { key: 'usage', Icon: BarChart3, view: 'usage' },
+  { key: 'perf', Icon: Gauge, view: 'perf' },
   { key: 'raw', Icon: Braces, view: 'raw' },
 ];
 
