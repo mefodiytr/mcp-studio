@@ -14,7 +14,7 @@ import { Input } from '@renderer/components/ui/input';
 import { describeError } from '@renderer/lib/errors';
 import { useHistory } from '@renderer/lib/history';
 import { expandTemplates } from '@renderer/lib/templating';
-import { callTool } from '@renderer/lib/tools';
+import { callTool, isWriteCall } from '@renderer/lib/tools';
 import { useTemplatingStore } from '@renderer/stores/templating';
 import type { ToolDescriptor } from '@shared/domain/connection';
 import type { CallToolResult, ContentBlock, ToolCallError } from '@shared/domain/tool-result';
@@ -108,7 +108,7 @@ export function ToolInvocationDialog({
       return;
     }
     try {
-      const res = await callTool(connectionId, tool.name, args);
+      const res = await callTool(connectionId, tool.name, args, { write: isWriteCall(tool.annotations) });
       setOutcome({ args, result: res.result, error: res.error });
     } catch (cause) {
       setOutcome({ args, result: null, error: describeError(cause) });

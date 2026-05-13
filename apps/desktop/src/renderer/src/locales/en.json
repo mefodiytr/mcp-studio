@@ -217,7 +217,10 @@
       "ok": "ok",
       "tool-error": "tool error",
       "error": "error"
-    }
+    },
+    "writesOnly": "Writes only",
+    "writeBadge": "write",
+    "export": "Export audit log"
   },
   "raw": {
     "title": "Raw JSON-RPC",

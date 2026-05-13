@@ -284,6 +284,10 @@ export class ConnectionManager {
     connectionId: string,
     toolName: string,
     args?: Record<string, unknown>,
+    /** If `true`, this call mutates server state — attributed in the audit
+     *  trail. The renderer computes this from the *effective* tool annotations
+     *  (post plugin override); main just stores what it's told. */
+    write?: boolean,
   ): Promise<ToolCallOutcome> {
     const managed = this.requireManaged(connectionId);
     const connection = this.requireConnected(connectionId);
@@ -315,6 +319,7 @@ export class ConnectionManager {
       error: outcome.error,
       ts: new Date().toISOString(),
       durationMs,
+      ...(write !== undefined ? { write } : {}),
     });
     this.onHistoryChanged();
     return outcome;

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Copy, History as HistoryIcon, ListRestart, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, History as HistoryIcon, ListRestart, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -34,6 +34,7 @@ export function HistoryPanel() {
   const historyQuery = useHistory();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [writesOnly, setWritesOnly] = useState(false);
   const [editing, setEditing] = useState<{
     connectionId: string;
     tool: ToolDescriptor;
@@ -45,12 +46,25 @@ export function HistoryPanel() {
     const q = query.trim().toLowerCase();
     return entries.filter((entry) => {
       if (status !== 'all' && entry.status !== status) return false;
+      if (writesOnly && !entry.write) return false;
       if (q && !entry.toolName.toLowerCase().includes(q) && !(entry.serverName ?? '').toLowerCase().includes(q)) {
         return false;
       }
       return true;
     });
-  }, [entries, query, status]);
+  }, [entries, query, status, writesOnly]);
+
+  const exportJson = (): void => {
+    const blob = new Blob([JSON.stringify(visible, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mcp-studio-audit-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-auto p-6">
@@ -72,10 +86,26 @@ export function HistoryPanel() {
           <option value="tool-error">{t('history.status.tool-error')}</option>
           <option value="error">{t('history.status.error')}</option>
         </select>
+        <button
+          type="button"
+          onClick={() => setWritesOnly((v) => !v)}
+          className={cn('h-9 rounded-md border px-3 text-sm', writesOnly && 'bg-accent text-accent-foreground')}
+        >
+          {t('history.writesOnly')}
+        </button>
         <Button
           size="sm"
           variant="ghost"
           className="ml-auto"
+          disabled={visible.length === 0}
+          onClick={exportJson}
+        >
+          <Download />
+          {t('history.export')}
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           disabled={entries.length === 0}
           onClick={() => void clearHistory()}
         >
@@ -141,7 +171,9 @@ function HistoryRow({
 
   const rerun = (): void => {
     if (!alive) return;
-    void callTool(entry.connectionId, entry.toolName, asRecord(entry.args));
+    // Preserve the original audit attribution on re-run, so a re-issued write
+    // still shows up as a write in the audit trail.
+    void callTool(entry.connectionId, entry.toolName, asRecord(entry.args), { write: entry.write });
     toast.info(t('history.rerunning', { tool: entry.toolName }));
   };
   const copy = (): void => {
@@ -160,6 +192,11 @@ function HistoryRow({
             <span className={cn('rounded px-1.5 py-0.5 text-[10px]', STATUS_CLASS[entry.status])}>
               {t(`history.status.${entry.status}`)}
             </span>
+            {entry.write && (
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                {t('history.writeBadge')}
+              </span>
+            )}
             <span className="text-xs text-muted-foreground">
               {entry.serverName ?? entry.profileId} · {relativeTime(entry.ts)} · {entry.durationMs} ms
             </span>

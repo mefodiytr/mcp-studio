@@ -17,11 +17,26 @@ export function useTools(connectionId: string | undefined): UseQueryResult<ToolD
   });
 }
 
+/** Effective annotations-derived "this call writes" flag — true when the tool
+ *  is destructive, or when `readOnlyHint` is explicitly false. Used by the
+ *  invocation dialog (and any other caller that has the effective annotations)
+ *  to attribute the call in the audit trail. */
+export function isWriteCall(annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } | undefined): boolean {
+  if (!annotations) return false;
+  return annotations.destructiveHint === true || annotations.readOnlyHint === false;
+}
+
 export async function callTool(
   connectionId: string,
   toolName: string,
   args?: Record<string, unknown>,
+  opts?: { write?: boolean },
 ): Promise<ToolCallOutcome> {
   if (!window.studio) throw new Error('IPC bridge unavailable');
-  return window.studio.invoke('connections:call', { connectionId, toolName, args });
+  return window.studio.invoke('connections:call', {
+    connectionId,
+    toolName,
+    args,
+    ...(opts?.write !== undefined ? { write: opts.write } : {}),
+  });
 }

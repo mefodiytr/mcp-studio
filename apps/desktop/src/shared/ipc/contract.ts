@@ -106,6 +106,10 @@ export const invokeChannels = {
       connectionId: z.string(),
       toolName: z.string(),
       args: z.record(z.unknown()).optional(),
+      /** Audit attribution — true if the caller knows this is a write call
+       *  (computed from the effective tool annotations). Stored on the
+       *  history entry; absent when the caller doesn't know. */
+      write: z.boolean().optional(),
     }),
     response: toolCallOutcomeSchema,
   },

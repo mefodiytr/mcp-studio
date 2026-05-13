@@ -22,5 +22,10 @@ export const toolHistoryEntrySchema = z.object({
   ts: z.string(),
   /** Round-trip duration in milliseconds. */
   durationMs: z.number(),
+  /** True if this call mutated server state — computed at call time from the
+   *  *effective* tool annotations (after any plugin override), so the audit
+   *  trail reflects what the operator actually intended. Absent on entries
+   *  written before the audit flag was added. */
+  write: z.boolean().optional(),
 });
 export type ToolHistoryEntry = z.infer<typeof toolHistoryEntrySchema>;
