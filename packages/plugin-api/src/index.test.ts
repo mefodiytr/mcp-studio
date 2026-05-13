@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchesServerName, pluginManifestSchema } from './index';
+import { matchesServerName, mergeToolAnnotations, pluginManifestSchema } from './index';
 
 describe('matchesServerName', () => {
   it('matches by RegExp (case-insensitive when the pattern is)', () => {
@@ -43,5 +43,41 @@ describe('pluginManifestSchema', () => {
     expect(pluginManifestSchema.safeParse({ name: 'x', version: '', matches: /x/ }).success).toBe(false);
     expect(pluginManifestSchema.safeParse({ name: 'x', version: '0.1.0' }).success).toBe(false);
     expect(pluginManifestSchema.safeParse({ name: 'x', version: '0.1.0', matches: 123 }).success).toBe(false);
+  });
+});
+
+describe('mergeToolAnnotations', () => {
+  it('overlays defined keys from the override, leaving the rest of the base alone', () => {
+    expect(
+      mergeToolAnnotations({ readOnlyHint: true, idempotentHint: true }, { readOnlyHint: false, destructiveHint: true }),
+    ).toEqual({ readOnlyHint: false, destructiveHint: true, idempotentHint: true });
+  });
+
+  it('treats an absent override key as "leave the base value" (no clobber)', () => {
+    expect(mergeToolAnnotations({ readOnlyHint: true, destructiveHint: false }, { destructiveHint: true })).toEqual({
+      readOnlyHint: true,
+      destructiveHint: true,
+    });
+    // an explicit `undefined` in the override is also a no-op for that key
+    expect(mergeToolAnnotations({ readOnlyHint: true }, { readOnlyHint: undefined, destructiveHint: true })).toEqual({
+      readOnlyHint: true,
+      destructiveHint: true,
+    });
+  });
+
+  it('returns the base unchanged when there is no override, and a fresh object from the override over no base', () => {
+    const base = { readOnlyHint: true };
+    expect(mergeToolAnnotations(base, undefined)).toBe(base);
+    const merged = mergeToolAnnotations(undefined, { destructiveHint: true });
+    expect(merged).toEqual({ destructiveHint: true });
+    expect(mergeToolAnnotations(undefined, undefined)).toBeUndefined();
+  });
+
+  it('does not mutate its inputs', () => {
+    const base = { readOnlyHint: true };
+    const override = { readOnlyHint: false };
+    mergeToolAnnotations(base, override);
+    expect(base).toEqual({ readOnlyHint: true });
+    expect(override).toEqual({ readOnlyHint: false });
   });
 });

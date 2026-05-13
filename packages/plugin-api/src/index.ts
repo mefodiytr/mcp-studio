@@ -62,6 +62,35 @@ export interface PluginContext {
   setCwd(path: string | undefined): void;
 }
 
+/** Tool annotation hints (`tools/list` → `Tool.annotations`). Structural — kept
+ *  dependency-free; mirrors the MCP `ToolAnnotations` shape. */
+export interface ToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+/** Merge a plugin's annotation override over a server's advertised annotations:
+ *  every *defined* key in `override` wins; undefined / absent keys leave `base`
+ *  alone. Used by the host when a plugin's {@link Plugin.toolAnnotationOverrides}
+ *  corrects a server whose `tools/list` ships wrong hints (e.g. a write tool
+ *  advertised `readOnlyHint: true`). Returns a fresh object; never mutates. */
+export function mergeToolAnnotations(
+  base: ToolAnnotations | undefined,
+  override: ToolAnnotations | undefined,
+): ToolAnnotations | undefined {
+  if (!override) return base;
+  const merged: ToolAnnotations = { ...base };
+  if (override.title !== undefined) merged.title = override.title;
+  if (override.readOnlyHint !== undefined) merged.readOnlyHint = override.readOnlyHint;
+  if (override.destructiveHint !== undefined) merged.destructiveHint = override.destructiveHint;
+  if (override.idempotentHint !== undefined) merged.idempotentHint = override.idempotentHint;
+  if (override.openWorldHint !== undefined) merged.openWorldHint = override.openWorldHint;
+  return merged;
+}
+
 export interface PluginView {
   /** Stable id — used as the rail-item key / tab type. */
   id: string;
@@ -84,11 +113,17 @@ export interface PluginCommand {
 }
 
 /** A plugin = a manifest + the views it contributes, plus optional per-context
- *  commands and tool-name → schema hints for the generic Tools-catalog form. */
+ *  commands, tool-name → schema hints for the generic Tools-catalog form, and
+ *  tool-name → annotation overrides. */
 export interface Plugin {
   manifest: PluginManifest;
   views: PluginView[];
   commands?: (ctx: PluginContext) => PluginCommand[];
   /** tool-name → JSON-Schema-ish hint, merged into the generic Tools form. */
   toolSchemaHints?: Record<string, unknown>;
+  /** tool-name → an overlay onto the server's advertised tool annotations
+   *  (see {@link mergeToolAnnotations}). For correcting servers whose
+   *  `tools/list` ships wrong hints — e.g. a write tool marked `readOnlyHint:
+   *  true` — so the host's destructive-confirm gate and badges are accurate. */
+  toolAnnotationOverrides?: Record<string, ToolAnnotations>;
 }
