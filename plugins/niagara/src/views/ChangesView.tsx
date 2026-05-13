@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, CircleAlert, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
+import { Check, CircleAlert, KeyRound, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
 import {
   Button,
   cn,
@@ -15,6 +15,7 @@ import type { PluginContext } from '@mcp-studio/plugin-api';
 
 import { describe, isReversible } from '../lib/write-ops';
 import { selectQueue, usePendingStore, type QueuedOp } from '../state/pending-store';
+import { BootstrapBearerDialog, useBootstrapMode } from './BootstrapBearer';
 
 /**
  * The pending-changes / diff-and-approve view — the active connection's write
@@ -35,6 +36,8 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
   const queryClient = useQueryClient();
   const [applying, setApplying] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [bootstrapOpen, setBootstrapOpen] = useState(false);
+  const bootstrap = useBootstrapMode(ctx);
 
   const pending = queue.filter((q) => q.status === 'pending' || q.status === 'running');
   const irreversibleCount = pending.filter((q) => !isReversible(q.op)).length;
@@ -54,19 +57,18 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
     }
   };
 
-  if (total === 0) {
-    return (
-      <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        No pending changes. Edits queued from the Property sheet or the tree menu appear here.
-      </div>
-    );
-  }
+  const bootstrapButton = bootstrap.mode.kind !== 'unavailable' && (
+    <Button size="sm" variant="ghost" onClick={() => setBootstrapOpen(true)} title="Bootstrap a user-context Bearer">
+      <KeyRound className="size-3.5" aria-hidden />
+      {bootstrap.mode.kind === 'test' ? 'Bootstrap user token (test mode)' : 'Bootstrap user token'}
+    </Button>
+  );
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b p-2 text-xs">
         <p className="font-medium">
-          {total} pending change{total === 1 ? '' : 's'}
+          {total === 0 ? 'No pending changes' : (<>{total} pending change{total === 1 ? '' : 's'}</>)}
           {irreversibleCount > 0 && (
             <>
               {' · '}
@@ -74,6 +76,7 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
             </>
           )}
         </p>
+        {bootstrapButton}
         <label className="ml-auto flex items-center gap-1 text-muted-foreground">
           <input type="checkbox" checked={autoCommit} onChange={(e) => setAutoCommit(e.target.checked)} />
           Auto-commit
@@ -92,16 +95,29 @@ export function ChangesView({ ctx }: { ctx: PluginContext }) {
           Auto-commit on — each queued edit applies immediately. Use only on a dev station.
         </p>
       )}
-      <ul className="min-h-0 flex-1 divide-y overflow-auto text-sm">
-        {queue.map((q) => (
-          <OpRow
-            key={q.id}
-            item={q}
-            onRemove={() => remove(cid, q.id)}
-            disabled={applying || q.status === 'running' || q.status === 'done'}
-          />
-        ))}
-      </ul>
+      {total === 0 ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          Edits queued from the Property sheet or the tree menu appear here.
+        </div>
+      ) : (
+        <ul className="min-h-0 flex-1 divide-y overflow-auto text-sm">
+          {queue.map((q) => (
+            <OpRow
+              key={q.id}
+              item={q}
+              onRemove={() => remove(cid, q.id)}
+              disabled={applying || q.status === 'running' || q.status === 'done'}
+            />
+          ))}
+        </ul>
+      )}
+
+      <BootstrapBearerDialog
+        ctx={ctx}
+        mode={bootstrap.mode}
+        open={bootstrapOpen}
+        onOpenChange={setBootstrapOpen}
+      />
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
