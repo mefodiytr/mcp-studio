@@ -12,11 +12,13 @@ import { registerHistoryHandlers } from './ipc/history';
 import { registerOAuthHandlers } from './ipc/oauth';
 import { registerProfileHandlers } from './ipc/profiles';
 import { registerProtocolHandlers } from './ipc/protocol';
+import { registerWatchHandlers } from './ipc/watches';
 import { createConfigStore, type AppConfig } from './store/config-store';
 import { CredentialVault, createCredentialVaultStore, type SecretCipher } from './store/credential-vault';
 import type { JsonStore } from './store/json-store';
 import { ProfileRepository } from './store/profile-repository';
 import { ToolHistoryRepository } from './store/tool-history-repository';
+import { WatchRepository } from './store/watch-repository';
 import { createWorkspaceStore } from './store/workspace-store';
 
 // Set before any path lookups so userData lives under "MCP Studio", not the
@@ -119,6 +121,7 @@ if (!gotSingleInstanceLock) {
     const workspaceStore = createWorkspaceStore(userData);
     const profiles = new ProfileRepository(workspaceStore);
     const toolHistory = new ToolHistoryRepository(workspaceStore);
+    const watches = new WatchRepository(workspaceStore);
 
     const cipher: SecretCipher = {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -157,6 +160,7 @@ if (!gotSingleInstanceLock) {
     registerConnectionHandlers(connectionManager);
     registerProtocolHandlers(protocolTap);
     registerHistoryHandlers(toolHistory);
+    registerWatchHandlers(watches);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

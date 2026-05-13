@@ -12,6 +12,7 @@ import {
 } from '../domain/resource';
 import { toolHistoryEntrySchema } from '../domain/tool-history';
 import { rawRequestOutcomeSchema, toolCallOutcomeSchema } from '../domain/tool-result';
+import { watchSchema } from '../domain/watches';
 
 /**
  * The single source of truth for the renderer ↔ main IPC surface.
@@ -167,6 +168,16 @@ export const invokeChannels = {
   },
   'history:clear': {
     request: z.object({}),
+    response: z.object({}),
+  },
+
+  // ── Per-profile watch lists (M4 live monitor) ────────────────────────────
+  'watches:list': {
+    request: z.object({ profileId: z.string() }),
+    response: z.object({ watches: z.array(watchSchema) }),
+  },
+  'watches:set': {
+    request: z.object({ profileId: z.string(), watches: z.array(watchSchema) }),
     response: z.object({}),
   },
 } as const;
