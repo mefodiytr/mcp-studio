@@ -3,6 +3,7 @@ import { Boxes, List, Network, Terminal } from 'lucide-react';
 import type { Plugin } from '@mcp-studio/plugin-api';
 
 import { NIAGARA_MANIFEST } from './manifest';
+import { NIAGARA_TOOL_ANNOTATION_OVERRIDES } from './tool-annotations';
 import { NIAGARA_TOOL_HINTS } from './tool-hints';
 
 // View bodies are lazy chunks — the plugin's entry (this file, eagerly imported
@@ -24,4 +25,5 @@ export const niagaraPlugin: Plugin = {
     { id: 'bql', title: 'BQL', icon: Terminal, component: BqlView },
   ],
   toolSchemaHints: NIAGARA_TOOL_HINTS,
+  toolAnnotationOverrides: NIAGARA_TOOL_ANNOTATION_OVERRIDES,
 };

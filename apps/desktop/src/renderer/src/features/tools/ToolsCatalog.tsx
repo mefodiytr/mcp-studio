@@ -6,6 +6,7 @@ import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { useConnections } from '@renderer/lib/connections';
 import { useHistory } from '@renderer/lib/history';
+import { applyAnnotationOverrides } from '@renderer/lib/plugin-tools';
 import { useTools } from '@renderer/lib/tools';
 import { cn } from '@renderer/lib/utils';
 import { pickPlugin } from '@renderer/plugins/registry';
@@ -51,7 +52,13 @@ export function ToolsCatalog() {
     return map;
   }, [historyQuery.data, activeId]);
 
-  const tools = toolsQuery.data ?? [];
+  // Apply the active plugin's annotation overrides *once*, list-wide — so the
+  // filters, badges, and the invocation dialog's destructive-confirm gate all
+  // see the same effective annotations (no drift between badge and behaviour).
+  const tools = useMemo(
+    () => (toolsQuery.data ?? []).map((t) => applyAnnotationOverrides(t, plugin)),
+    [toolsQuery.data, plugin],
+  );
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tools.filter((tool) => {
