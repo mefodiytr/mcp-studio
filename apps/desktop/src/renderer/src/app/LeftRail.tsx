@@ -1,6 +1,7 @@
 import {
   Activity,
   BarChart3,
+  Bot,
   Braces,
   Files,
   Gauge,
@@ -22,7 +23,16 @@ import { Button } from '@renderer/components/ui/button';
 import { useTheme, type Theme } from '@renderer/lib/theme';
 import { cn } from '@renderer/lib/utils';
 
-export type AppView = 'connections' | 'tools' | 'resources' | 'prompts' | 'history' | 'raw' | 'usage' | 'perf';
+export type AppView =
+  | 'connections'
+  | 'tools'
+  | 'resources'
+  | 'prompts'
+  | 'history'
+  | 'raw'
+  | 'usage'
+  | 'perf'
+  | 'assistant';
 
 const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'servers', Icon: Server, view: 'connections' },
@@ -32,6 +42,7 @@ const NAV_ITEMS: { key: string; Icon: typeof Server; view?: AppView }[] = [
   { key: 'history', Icon: History, view: 'history' },
   { key: 'usage', Icon: BarChart3, view: 'usage' },
   { key: 'perf', Icon: Gauge, view: 'perf' },
+  { key: 'assistant', Icon: Bot, view: 'assistant' },
   { key: 'raw', Icon: Braces, view: 'raw' },
 ];
 

@@ -7,13 +7,16 @@ import { StdioPidTracker } from './connections/pid-tracker';
 import { ProtocolTap } from './connections/protocol-tap';
 import { emitToRenderers, registerIpcHandlers, startDemoEventSource } from './ipc';
 import { registerConnectionHandlers } from './ipc/connections';
+import { registerConversationHandlers } from './ipc/conversations';
 import { registerCredentialHandlers } from './ipc/credentials';
 import { registerHistoryHandlers } from './ipc/history';
+import { registerLlmHandlers } from './ipc/llm';
 import { registerOAuthHandlers } from './ipc/oauth';
 import { registerProfileHandlers } from './ipc/profiles';
 import { registerProtocolHandlers } from './ipc/protocol';
 import { registerWatchHandlers } from './ipc/watches';
 import { createConfigStore, type AppConfig } from './store/config-store';
+import { ConversationRepository } from './store/conversation-repository';
 import { CredentialVault, createCredentialVaultStore, type SecretCipher } from './store/credential-vault';
 import type { JsonStore } from './store/json-store';
 import { ProfileRepository } from './store/profile-repository';
@@ -122,6 +125,7 @@ if (!gotSingleInstanceLock) {
     const profiles = new ProfileRepository(workspaceStore);
     const toolHistory = new ToolHistoryRepository(workspaceStore);
     const watches = new WatchRepository(workspaceStore);
+    const conversations = new ConversationRepository(workspaceStore);
 
     const cipher: SecretCipher = {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -161,6 +165,8 @@ if (!gotSingleInstanceLock) {
     registerProtocolHandlers(protocolTap);
     registerHistoryHandlers(toolHistory);
     registerWatchHandlers(watches);
+    registerConversationHandlers(conversations);
+    registerLlmHandlers(vault);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

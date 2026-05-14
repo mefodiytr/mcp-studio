@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { oauthStatusSchema } from '../domain/auth';
 import { connectionSummarySchema, toolDescriptorSchema } from '../domain/connection';
+import { conversationSchema, messageSchema } from '../domain/conversations';
 import { profileInputSchema, profileSchema } from '../domain/profile';
 import { getPromptResultSchema, promptDescriptorSchema } from '../domain/prompt';
 import { protocolEventSchema } from '../domain/protocol';
@@ -178,6 +179,60 @@ export const invokeChannels = {
   },
   'watches:set': {
     request: z.object({ profileId: z.string(), watches: z.array(watchSchema) }),
+    response: z.object({}),
+  },
+
+  // ── Per-profile conversations (M5 chat foundation) ───────────────────────
+  'conversations:list': {
+    request: z.object({ profileId: z.string() }),
+    response: z.object({ conversations: z.array(conversationSchema) }),
+  },
+  'conversations:get': {
+    request: z.object({ profileId: z.string(), id: z.string() }),
+    response: z.object({ conversation: conversationSchema.nullable() }),
+  },
+  'conversations:save': {
+    request: z.object({ profileId: z.string(), conversation: conversationSchema }),
+    response: z.object({}),
+  },
+  'conversations:delete': {
+    request: z.object({ profileId: z.string(), id: z.string() }),
+    response: z.object({}),
+  },
+  'conversations:append': {
+    request: z.object({
+      profileId: z.string(),
+      conversationId: z.string(),
+      message: messageSchema,
+    }),
+    response: z.object({ conversation: conversationSchema.nullable() }),
+  },
+
+  // ── LLM provider config + API key (M5 D1 + D4) ───────────────────────────
+  'llm:config': {
+    request: z.object({}),
+    /** Renderer reads this once at chat-session start to pick mock vs real
+     *  provider (env-driven; the e2e specs set MCPSTUDIO_LLM_PROVIDER=mock). */
+    response: z.object({ provider: z.enum(['anthropic', 'mock']) }),
+  },
+  'llm:hasKey': {
+    request: z.object({ provider: z.string() }),
+    response: z.object({ hasKey: z.boolean(), hint: z.string().nullable() }),
+  },
+  'llm:setKey': {
+    request: z.object({ provider: z.string(), key: z.string().min(1) }),
+    response: z.object({ hint: z.string() }),
+  },
+  /** Returns the decrypted key. Renderer-only consumption per M5 D1 — the
+   *  ESM `@anthropic-ai/sdk` ships ESM-first and main is CJS-bundled. Trade-off
+   *  documented in `docs/milestone-5.md` D4 Adjustments. The key lives in
+   *  renderer memory only for the lifetime of one ReAct runner. */
+  'llm:getKey': {
+    request: z.object({ provider: z.string() }),
+    response: z.object({ key: z.string().nullable() }),
+  },
+  'llm:clearKey': {
+    request: z.object({ provider: z.string() }),
     response: z.object({}),
   },
 } as const;

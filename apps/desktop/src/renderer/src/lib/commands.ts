@@ -44,6 +44,7 @@ const VIEW_KEYS: { view: AppView; navKey: string }[] = [
   { view: 'history', navKey: 'history' },
   { view: 'usage', navKey: 'usage' },
   { view: 'perf', navKey: 'perf' },
+  { view: 'assistant', navKey: 'assistant' },
   { view: 'raw', navKey: 'raw' },
 ];
 

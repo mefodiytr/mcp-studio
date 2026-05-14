@@ -36,6 +36,7 @@ const HistoryPanel = lazy(() =>
 const RawConsole = lazy(() => import('@renderer/features/raw/RawConsole').then((m) => ({ default: m.RawConsole })));
 const UsageView = lazy(() => import('@renderer/features/usage/UsageView').then((m) => ({ default: m.UsageView })));
 const PerfView = lazy(() => import('@renderer/features/perf/PerfView').then((m) => ({ default: m.PerfView })));
+const ChatView = lazy(() => import('@renderer/features/chat/ChatView').then((m) => ({ default: m.ChatView })));
 const ProtocolInspector = lazy(() =>
   import('@renderer/features/inspector/ProtocolInspector').then((m) => ({ default: m.ProtocolInspector })),
 );
@@ -56,6 +57,8 @@ function BuiltinView({ view }: { view: AppView }) {
       return <UsageView />;
     case 'perf':
       return <PerfView />;
+    case 'assistant':
+      return <ChatView />;
     case 'connections':
       return <ConnectionsView />;
   }

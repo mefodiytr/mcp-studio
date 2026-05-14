@@ -22,22 +22,28 @@ export interface CredentialVaultData {
    *  artifacts (tokens + DCR client info). The whole blob is encrypted — it
    *  carries the refresh token and possibly a client secret. */
   oauth: Record<string, { enc: string }>;
+  /** Workspace-global LLM provider API keys (M5 D4): `provider` → { enc, hint }.
+   *  Provider-account-tied, not per-profile — one key serves all connections.
+   *  Per-profile override is M6+. */
+  llmKeys: Record<string, { enc: string; hint: string }>;
 }
 
-const VAULT_VERSION = 2;
+const VAULT_VERSION = 3;
 
 export function createCredentialVaultStore(userDataDir: string): JsonStore<CredentialVaultData> {
   return new JsonStore<CredentialVaultData>({
     filePath: join(userDataDir, 'credentials.json'),
     version: VAULT_VERSION,
-    defaults: { schemaVersion: VAULT_VERSION, secrets: {}, oauth: {} },
+    defaults: { schemaVersion: VAULT_VERSION, secrets: {}, oauth: {}, llmKeys: {} },
     migrate: (data) => {
-      // v1 → v2: add the `oauth` map. (v1 had only `schemaVersion` + `secrets`.)
+      // v1 → v2: add the `oauth` map. v2 → v3 (M5): add the `llmKeys` map.
+      // Idempotent — re-running on a v3 file is a no-op.
       const previous = data as Partial<CredentialVaultData>;
       return {
         schemaVersion: VAULT_VERSION,
         secrets: previous.secrets ?? {},
         oauth: previous.oauth ?? {},
+        llmKeys: previous.llmKeys ?? {},
       };
     },
   });
@@ -117,6 +123,40 @@ export class CredentialVault {
   deleteOAuthArtifacts(profileId: string): void {
     if (this.store.data.oauth[profileId]) {
       delete this.store.data.oauth[profileId];
+      this.store.save();
+    }
+  }
+
+  // ── Workspace-global LLM provider API keys (M5 D4) ───────────────────────
+
+  setLlmKey(provider: string, key: string): string {
+    const enc = this.cipher.encrypt(key).toString('base64');
+    const hint = hintFor(key);
+    this.store.data.llmKeys[provider] = { enc, hint };
+    this.store.save();
+    return hint;
+  }
+
+  /** Decrypt and return the key. Main-process only — exposed to the renderer
+   *  via the `llm:getKey` IPC (the renderer-side ESM trade-off; see
+   *  `docs/milestone-5.md` D4 Adjustments). */
+  getLlmKey(provider: string): string | undefined {
+    const entry = this.store.data.llmKeys[provider];
+    if (!entry) return undefined;
+    return this.cipher.decrypt(Buffer.from(entry.enc, 'base64'));
+  }
+
+  getLlmKeyHint(provider: string): string | undefined {
+    return this.store.data.llmKeys[provider]?.hint;
+  }
+
+  hasLlmKey(provider: string): boolean {
+    return provider in this.store.data.llmKeys;
+  }
+
+  deleteLlmKey(provider: string): void {
+    if (this.store.data.llmKeys[provider]) {
+      delete this.store.data.llmKeys[provider];
       this.store.save();
     }
   }

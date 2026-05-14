@@ -113,7 +113,49 @@ describe('CredentialVault — OAuth artifacts', () => {
     expect(vault.getOAuthArtifacts('p').tokens?.access_token).toBe('x');
 
     const onDisk = JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')) as Record<string, unknown>;
-    expect(onDisk['schemaVersion']).toBe(2);
+    expect(onDisk['schemaVersion']).toBe(3);
     expect(onDisk['oauth']).toBeDefined();
+    expect(onDisk['llmKeys']).toBeDefined();
+  });
+});
+
+describe('CredentialVault — LLM keys (M5 D4)', () => {
+  it('stores LLM keys encrypted by provider, returning the hint', () => {
+    const vault = makeVault();
+    const key = 'sk-ant-aaa-1234567890abcdef';
+    expect(vault.setLlmKey('anthropic', key)).toBe('••••cdef');
+
+    const raw = readFileSync(join(dir, 'credentials.json'), 'utf8');
+    expect(raw).not.toContain(key);
+    expect(raw).toContain('••••cdef');
+
+    expect(vault.hasLlmKey('anthropic')).toBe(true);
+    expect(vault.getLlmKey('anthropic')).toBe(key);
+    expect(vault.getLlmKeyHint('anthropic')).toBe('••••cdef');
+    expect(vault.hasLlmKey('openai')).toBe(false);
+  });
+
+  it('persists across vault re-opens, supports delete', () => {
+    const first = makeVault();
+    first.setLlmKey('anthropic', 'sk-ant-aaa');
+    const second = makeVault();
+    expect(second.getLlmKey('anthropic')).toBe('sk-ant-aaa');
+    second.deleteLlmKey('anthropic');
+    expect(makeVault().hasLlmKey('anthropic')).toBe(false);
+  });
+
+  it('migrates a v2 credentials.json that has no `llmKeys` map', () => {
+    const v2 = {
+      schemaVersion: 2,
+      secrets: { p: { enc: Buffer.from('tok', 'utf8').toString('base64'), hint: '••••' } },
+      oauth: {},
+    };
+    writeFileSync(join(dir, 'credentials.json'), `${JSON.stringify(v2, null, 2)}\n`);
+
+    const vault = makeVault();
+    expect(vault.getSecret('p')).toBe('tok');
+    expect(vault.hasLlmKey('anthropic')).toBe(false);
+    vault.setLlmKey('anthropic', 'sk-fresh');
+    expect(vault.getLlmKey('anthropic')).toBe('sk-fresh');
   });
 });
