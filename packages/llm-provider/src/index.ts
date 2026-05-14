@@ -29,4 +29,4 @@ export { FakeLlmProvider, textTurn, toolUseTurn } from './fake';
 export type { FakeProviderTurn } from './fake';
 
 export { MockLlmProvider, matchUserText } from './mock-programs';
-export type { MockProgram } from './mock-programs';
+export type { MockProgram, MockEvent, MockDelay } from './mock-programs';

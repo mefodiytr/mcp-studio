@@ -15,6 +15,12 @@
  */
 import type { LlmEvent, LlmMessage, LlmProvider, LlmStreamRequest } from './types';
 
+/** A sentinel event the mock interprets as `await sleep(ms)` — used by the
+ *  M5 chat-cancel e2e to slow the stream so the Stop button has time to
+ *  abort mid-emission. The mock filters these out before yielding. */
+export type MockDelay = { type: '__delay'; ms: number };
+export type MockEvent = LlmEvent | MockDelay;
+
 export interface MockProgram {
   /** Stable id; used for `MCPSTUDIO_LLM_PROVIDER=mock` debugging. */
   id: string;
@@ -22,8 +28,9 @@ export interface MockProgram {
    *  e2e specs typically match on the **last** user message's text. */
   match: (req: LlmStreamRequest) => boolean;
   /** Sequence of turns. The Nth call to `streamResponse` yields the Nth
-   *  turn's events. */
-  turns: { events: LlmEvent[] }[];
+   *  turn's events. Mix in `{type:'__delay', ms}` entries to pace the
+   *  emission (e2e cancel + slow-stream cases). */
+  turns: { events: MockEvent[] }[];
 }
 
 export class MockLlmProvider implements LlmProvider {
@@ -76,9 +83,36 @@ export class MockLlmProvider implements LlmProvider {
           'AbortError',
         );
       }
+      if (ev.type === '__delay') {
+        await sleep(ev.ms, req.signal);
+        continue;
+      }
       yield ev;
     }
   }
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      const reason = signal?.reason;
+      reject(new DOMException(typeof reason === 'string' ? reason : 'aborted', 'AbortError'));
+    };
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        const reason = signal.reason;
+        reject(new DOMException(typeof reason === 'string' ? reason : 'aborted', 'AbortError'));
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
 }
 
 /** Match-by-last-user-message-substring — the convenience the e2e specs use. */
