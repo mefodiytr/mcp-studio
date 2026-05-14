@@ -12,7 +12,7 @@ import {
   resourceTemplateDescriptorSchema,
 } from '../domain/resource';
 import { toolHistoryEntrySchema } from '../domain/tool-history';
-import { rawRequestOutcomeSchema, toolCallOutcomeSchema } from '../domain/tool-result';
+import { rawRequestOutcomeSchema, toolCallerSchema, toolCallOutcomeSchema } from '../domain/tool-result';
 import { watchSchema } from '../domain/watches';
 
 /**
@@ -112,6 +112,13 @@ export const invokeChannels = {
        *  (computed from the effective tool annotations). Stored on the
        *  history entry; absent when the caller doesn't know. */
       write: z.boolean().optional(),
+      /** **M5 C75** — caller attribution. Absent = 'human' (every M1–M4
+       *  caller omits this and gets the back-compat path). `{type:'ai', …}`
+       *  triggers the safety boundary: main looks up effective annotations,
+       *  and if `isWriteCall` is true, returns `pendingEnqueued` instead of
+       *  dispatching — the renderer routes the op to the plugin's
+       *  pending-changes queue for operator approval. */
+      caller: toolCallerSchema.optional(),
     }),
     response: toolCallOutcomeSchema,
   },

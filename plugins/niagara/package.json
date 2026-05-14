@@ -5,7 +5,8 @@
   "type": "module",
   "description": "MCP Studio in-box plugin: a read-only Niagara station browser (works against niagaramcp).",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

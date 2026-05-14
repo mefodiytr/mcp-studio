@@ -1,6 +1,14 @@
 import { describe as descBlock, expect, it } from 'vitest';
 
-import { bsimpleKind, describe, isReversible, parseBSimpleValue, toToolCall, type WriteOp } from './write-ops';
+import {
+  bsimpleKind,
+  describe,
+  fromToolCall,
+  isReversible,
+  parseBSimpleValue,
+  toToolCall,
+  type WriteOp,
+} from './write-ops';
 
 const ops: Record<WriteOp['type'], WriteOp> = {
   setSlot: { type: 'setSlot', ord: 'station:|slot:/Logic/Reg1', slotName: 'out', oldValue: 1, newValue: 42 },
@@ -158,5 +166,106 @@ descBlock('toToolCall', () => {
       name: 'unlinkSlots',
       arguments: { sinkOrd: 'station:|slot:/Logic/B', linkName: 'In16' },
     });
+  });
+});
+
+descBlock('fromToolCall (M5 C75 — AI-write-routing inverse)', () => {
+  it('round-trips setSlot via toToolCall', () => {
+    const op = fromToolCall('setSlot', {
+      ord: 'station:|slot:/Logic/Reg1',
+      slotName: 'out',
+      value: 42,
+    });
+    expect(op).toMatchObject({
+      type: 'setSlot',
+      ord: 'station:|slot:/Logic/Reg1',
+      slotName: 'out',
+      newValue: 42,
+    });
+    // oldValue is unknown to the AI caller; the Changes view tolerates undefined.
+    expect((op as Extract<WriteOp, { type: 'setSlot' }>).oldValue).toBeUndefined();
+  });
+
+  it('parses clearSlot', () => {
+    expect(fromToolCall('clearSlot', { ord: 'station:|slot:/X', slotName: 's' })).toMatchObject({
+      type: 'clearSlot',
+      ord: 'station:|slot:/X',
+      slotName: 's',
+    });
+  });
+
+  it('parses createComponent (with and without nameStrategy)', () => {
+    expect(
+      fromToolCall('createComponent', {
+        parentOrd: 'station:|slot:/Drivers',
+        type: 'driver:DriverContainer',
+        name: 'X',
+        nameStrategy: 'suffix',
+      }),
+    ).toEqual({
+      type: 'createComponent',
+      parentOrd: 'station:|slot:/Drivers',
+      componentType: 'driver:DriverContainer',
+      name: 'X',
+      nameStrategy: 'suffix',
+    });
+    expect(
+      fromToolCall('createComponent', {
+        parentOrd: 'station:|slot:/Drivers',
+        type: 'driver:DriverContainer',
+        name: 'X',
+      }),
+    ).toMatchObject({ type: 'createComponent', name: 'X' });
+  });
+
+  it('parses removeComponent with optional force', () => {
+    expect(fromToolCall('removeComponent', { ord: 'station:|slot:/X', force: true })).toEqual({
+      type: 'removeComponent',
+      ord: 'station:|slot:/X',
+      force: true,
+    });
+    expect(fromToolCall('removeComponent', { ord: 'station:|slot:/X' })).toEqual({
+      type: 'removeComponent',
+      ord: 'station:|slot:/X',
+    });
+  });
+
+  it('parses addExtension, linkSlots, unlinkSlots', () => {
+    expect(
+      fromToolCall('addExtension', {
+        parentOrd: 'station:|slot:/X',
+        extensionType: 'history:NumericIntervalExt',
+        name: 'History',
+      }),
+    ).toMatchObject({ type: 'addExtension', extensionType: 'history:NumericIntervalExt' });
+    expect(
+      fromToolCall('linkSlots', {
+        sourceOrd: 'station:|slot:/A',
+        sourceSlot: 'out',
+        sinkOrd: 'station:|slot:/B',
+        sinkSlot: 'in',
+      }),
+    ).toMatchObject({ type: 'linkSlots', sourceOrd: 'station:|slot:/A' });
+    expect(
+      fromToolCall('unlinkSlots', { sinkOrd: 'station:|slot:/B', linkName: 'In16' }),
+    ).toEqual({
+      type: 'unlinkSlots',
+      sinkOrd: 'station:|slot:/B',
+      linkName: 'In16',
+    });
+  });
+
+  it('returns null for unknown tool names', () => {
+    expect(fromToolCall('commitStation', {})).toBeNull();
+    expect(fromToolCall('createSpace', { name: 'X' })).toBeNull();
+    expect(fromToolCall('readPoint', { ord: 'x' })).toBeNull();
+    expect(fromToolCall('made-up-tool', {})).toBeNull();
+  });
+
+  it('returns null when required string args are missing or empty', () => {
+    expect(fromToolCall('setSlot', { ord: '', slotName: 'x', value: 1 })).toBeNull();
+    expect(fromToolCall('setSlot', { ord: 'x', slotName: '', value: 1 })).toBeNull();
+    expect(fromToolCall('createComponent', { parentOrd: 'x', type: 'y' })).toBeNull(); // no name
+    expect(fromToolCall('linkSlots', { sourceOrd: 'a', sourceSlot: 'o' })).toBeNull(); // missing sink
   });
 });

@@ -153,6 +153,10 @@ const STATUS_CLASS: Record<ToolHistoryEntry['status'], string> = {
   ok: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
   'tool-error': 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   error: 'bg-destructive/15 text-destructive',
+  // M5 C75 — AI-proposed write intercepted by the safety boundary, routed to
+  // the plugin pending-changes queue instead of executing. Blue to match the
+  // ChangesView "AI" chip.
+  queued: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
 };
 
 function HistoryRow({

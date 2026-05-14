@@ -126,6 +126,113 @@ export function parseBSimpleValue(kind: Exclude<BSimpleKind, null>, raw: string)
   }
 }
 
+/** **M5 C75** — inverse of {@link toToolCall}. Given a Niagara tool name +
+ *  args (the shape the M5 safety boundary forwards when intercepting an
+ *  AI-attributed write call), return the matching `WriteOp` if the call is
+ *  one this plugin understands, otherwise `null`. The chat view's pending-
+ *  enqueue path uses this to materialize the AI's intent into the same
+ *  `WriteOp` tagged union the Property Sheet + tree menu emit, so the
+ *  Changes view + apply loop render / apply AI-proposed ops identically to
+ *  human-proposed ones.
+ *
+ *  Out-of-scope tools (`commitStation`, `dryRunRemove`, the entire
+ *  knowledge / walkthrough-write family) return null. The chat view surfaces
+ *  "no plugin can render this op" in that case. */
+export function fromToolCall(
+  name: string,
+  args: Record<string, unknown>,
+): WriteOp | null {
+  switch (name) {
+    case 'setSlot': {
+      const ord = stringArg(args.ord);
+      const slotName = stringArg(args.slotName);
+      if (!ord || !slotName) return null;
+      return {
+        type: 'setSlot',
+        ord,
+        slotName,
+        // oldValue is unknown to the LLM; the Changes view renders without
+        // a "was X" hint for AI-proposed ops. (m5-followup: optionally
+        // fetch via getSlots before enqueueing for the parity render.)
+        oldValue: undefined,
+        newValue: args.value,
+      };
+    }
+    case 'clearSlot': {
+      const ord = stringArg(args.ord);
+      const slotName = stringArg(args.slotName);
+      if (!ord || !slotName) return null;
+      return { type: 'clearSlot', ord, slotName, oldValue: undefined };
+    }
+    case 'createComponent': {
+      const parentOrd = stringArg(args.parentOrd);
+      const componentType = stringArg(args.type);
+      const componentName = stringArg(args.name);
+      if (!parentOrd || !componentType || !componentName) return null;
+      const nameStrategy = stringArg(args.nameStrategy);
+      const op: WriteOp = {
+        type: 'createComponent',
+        parentOrd,
+        componentType,
+        name: componentName,
+        ...(nameStrategy === 'fail' || nameStrategy === 'suffix' ? { nameStrategy } : {}),
+      };
+      return op;
+    }
+    case 'removeComponent': {
+      const ord = stringArg(args.ord);
+      if (!ord) return null;
+      return {
+        type: 'removeComponent',
+        ord,
+        ...(args.force === true ? { force: true } : {}),
+      };
+    }
+    case 'addExtension': {
+      const parentOrd = stringArg(args.parentOrd);
+      const extensionType = stringArg(args.extensionType);
+      const extensionName = stringArg(args.name);
+      if (!parentOrd || !extensionType || !extensionName) return null;
+      const nameStrategy = stringArg(args.nameStrategy);
+      return {
+        type: 'addExtension',
+        parentOrd,
+        extensionType,
+        name: extensionName,
+        ...(nameStrategy === 'fail' || nameStrategy === 'suffix' ? { nameStrategy } : {}),
+      };
+    }
+    case 'linkSlots': {
+      const sourceOrd = stringArg(args.sourceOrd);
+      const sourceSlot = stringArg(args.sourceSlot);
+      const sinkOrd = stringArg(args.sinkOrd);
+      const sinkSlot = stringArg(args.sinkSlot);
+      if (!sourceOrd || !sourceSlot || !sinkOrd || !sinkSlot) return null;
+      const converterType = stringArg(args.converterType);
+      return {
+        type: 'linkSlots',
+        sourceOrd,
+        sourceSlot,
+        sinkOrd,
+        sinkSlot,
+        ...(converterType ? { converterType } : {}),
+      };
+    }
+    case 'unlinkSlots': {
+      const sinkOrd = stringArg(args.sinkOrd);
+      const linkName = stringArg(args.linkName);
+      if (!sinkOrd || !linkName) return null;
+      return { type: 'unlinkSlots', sinkOrd, linkName };
+    }
+    default:
+      return null;
+  }
+}
+
+function stringArg(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+
 /** The `{name, arguments}` pair to pass to `ctx.callTool` — exactly the shape
  *  niagaramcp's `tools/list` advertises for each tool. */
 export function toToolCall(op: WriteOp): { name: string; arguments: Record<string, unknown> } {

@@ -3,6 +3,7 @@ import { Bot, Send, StopCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { runReAct, type LlmMessage, type LlmTool, type RunnerEvent } from '@mcp-studio/llm-provider';
+import { enqueueAiWrite } from '@mcp-studio/niagara';
 
 import type { Conversation, ContentBlock, Message } from '../../../../shared/domain/conversations';
 
@@ -19,6 +20,7 @@ import { Input } from '@renderer/components/ui/input';
 import { useConnections } from '@renderer/lib/connections';
 import { createProvider, pickActiveProviderMode } from '@renderer/lib/llm-provider-factory';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
+import { callTool, useTools } from '@renderer/lib/tools';
 import {
   assemblePluginContributions,
   HOST_BASE_SYSTEM_PROMPT,
@@ -70,6 +72,21 @@ export function ChatView() {
   const remove = useConversationsStore((s) => s.remove);
   const appendMessage = useConversationsStore((s) => s.appendMessage);
   const patchInflight = useConversationsStore((s) => s.patchInflight);
+
+  // C75: the active connection's tool catalog, mapped to the LlmTool shape
+  // the ReAct loop hands the provider. The safety boundary at main intercepts
+  // AI-attributed write calls — every tool surfaces to the LLM regardless of
+  // its annotation, and main decides at dispatch time whether to execute or
+  // route to the pending-changes queue.
+  const toolsQuery = useTools(active?.connectionId);
+  const llmTools = useMemo<LlmTool[]>(() => {
+    const list = toolsQuery.data ?? [];
+    return list.map((t) => ({
+      name: t.name,
+      description: t.description ?? t.title ?? '',
+      inputSchema: (t.inputSchema as Record<string, unknown>) ?? { type: 'object', properties: {} },
+    }));
+  }, [toolsQuery.data]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const activeConversation = useMemo(
@@ -194,13 +211,17 @@ export function ChatView() {
     };
     await appendMessage(profileId, conversationId, userMessage);
 
-    // Build the provider + run the ReAct loop. Tools are empty in C71 — the
-    // wiring to ConnectionManager's tool catalog lands in C75 (after the
-    // safety boundary is in place for AI write attribution).
+    // Build the provider + run the ReAct loop. C75 wires the tool catalog +
+    // dispatches through the caller-attributed `connections:call` IPC — main
+    // intercepts AI-attributed effective-write calls at the safety boundary
+    // and returns `pendingEnqueued` instead of dispatching to the SDK; the
+    // chat view routes those into the active plugin's pending-changes queue.
     const controller = new AbortController();
     abortRef.current = controller;
     setStreamingText('');
     setStreamingToolCalls([]);
+
+    const connectionIdForDispatch = active?.connectionId;
 
     try {
       const mode = providerMode ?? 'anthropic';
@@ -209,15 +230,43 @@ export function ChatView() {
         role: 'user',
         content: [{ type: 'text', text }],
       });
-      const tools: LlmTool[] = [];
       const gen = runReAct({
         provider,
         system: contributions.systemPrompt,
         history,
-        tools,
-        dispatchTool: async () => {
-          // No tools wired in C71 — the LLM has none to call.
-          throw new Error('No tools available in C71');
+        tools: llmTools,
+        dispatchTool: async (name, args) => {
+          if (!connectionIdForDispatch) {
+            return 'error: no active connection';
+          }
+          const outcome = await callTool(connectionIdForDispatch, name, args, {
+            caller: { type: 'ai', conversationId: conversationId },
+          });
+          if (outcome.pendingEnqueued) {
+            // The M5 C75 safety boundary intercepted an AI-attributed write.
+            // Route the op into the active plugin's pending queue + tell the
+            // LLM we've queued it for operator approval.
+            const result = enqueueAiWrite(
+              connectionIdForDispatch,
+              { name: outcome.pendingEnqueued.toolName, args: outcome.pendingEnqueued.args },
+              { type: 'ai', conversationId },
+            );
+            if (result === 'enqueued') {
+              return `queued for operator approval — the Changes view now shows this proposed write with an "AI" badge. The operator will review and apply or reject it; do not assume the change has happened. Continue with read-only steps if appropriate; otherwise summarise what you proposed and wait.`;
+            }
+            if (result === 'unrenderable') {
+              return `error: this server's write tools are not yet supported by an MCP Studio plugin pending-queue. Do not propose this kind of write — describe what you would do in prose instead.`;
+            }
+            return 'error: no active connection to enqueue the write to';
+          }
+          if (outcome.error) {
+            return `error: ${outcome.error.message}`;
+          }
+          // Normal read-tool result. Stringify the content for the LLM —
+          // the runner concatenates whatever we return into the tool_result
+          // block. We pass through the full result JSON; the LLM is good at
+          // parsing nested structures.
+          return outcome.result ?? '';
         },
         signal: controller.signal,
       });
@@ -301,6 +350,8 @@ export function ChatView() {
     activeId,
     activeConversation,
     contributions.systemPrompt,
+    llmTools,
+    active?.connectionId,
     upsert,
     appendMessage,
     patchInflight,

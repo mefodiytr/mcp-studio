@@ -9,9 +9,16 @@ import type { ToolDescriptor } from '@shared/domain/connection';
  * through this **once** (in `ToolsCatalog`) so the badges, the annotation
  * filters, and the destructive-confirm gate in `ToolInvocationDialog` all see
  * the same effective annotations — there's only one resolution point.
+ *
+ * **M5 C75** — reads overrides from `plugin.manifest.toolAnnotationOverrides`
+ * (the canonical home; main reads the same field). Falls back to the
+ * deprecated runtime `plugin.toolAnnotationOverrides` for any non-migrated
+ * plugin; the Niagara plugin migrated in C75.
  */
 export function applyAnnotationOverrides(tool: ToolDescriptor, plugin: Plugin | undefined): ToolDescriptor {
-  const override = plugin?.toolAnnotationOverrides?.[tool.name];
+  const override =
+    plugin?.manifest.toolAnnotationOverrides?.[tool.name] ??
+    plugin?.toolAnnotationOverrides?.[tool.name];
   if (!override) return tool;
   // The host's `ToolDescriptor.annotations` is a passthrough'd schema (wider
   // type with an index signature); plugin-api's `ToolAnnotations` is the

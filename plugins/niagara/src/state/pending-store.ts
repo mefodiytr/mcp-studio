@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { PluginContext } from '@mcp-studio/plugin-api';
 
-import { toToolCall, type WriteOp } from '../lib/write-ops';
+import { fromToolCall, toToolCall, type WriteOp } from '../lib/write-ops';
 
 /**
  * The Niagara diff-and-approve "Hold" queue — per-connection (a connectionId
@@ -13,6 +13,12 @@ import { toToolCall, type WriteOp } from '../lib/write-ops';
 
 export type OpStatus = 'pending' | 'running' | 'done' | 'error';
 
+/** **M5 C75** — where an op came from. Absent = human-proposed (Property Sheet
+ *  edit, tree context menu — the M3 paths); `{type:'ai', conversationId}` =
+ *  AI-proposed via the safety boundary. The Changes view badges AI-proposed
+ *  ops with an "AI" chip + a deep-link back to the originating conversation. */
+export type OpSource = 'human' | { type: 'ai'; conversationId: string; agentId?: string };
+
 export interface QueuedOp {
   /** Stable id within a session — survives status transitions; not the op's
    *  identity (two enqueues of identical ops are two distinct entries). */
@@ -20,6 +26,9 @@ export interface QueuedOp {
   op: WriteOp;
   status: OpStatus;
   errorMessage?: string;
+  /** Provenance. Absent on every op enqueued before M5 C75 / from M3 callsites
+   *  that haven't been migrated; treated as `'human'` for badge purposes. */
+  source?: OpSource;
 }
 
 export interface ApplyResult {
@@ -41,7 +50,19 @@ interface PendingState {
    *  single op — fast iteration on dev stations. The Changes view exposes
    *  this as a toggle with a visible warning. */
   autoCommit: boolean;
-  enqueue: (connectionId: string, op: WriteOp) => string;
+  enqueue: (connectionId: string, op: WriteOp, source?: OpSource) => string;
+  /**
+   * **M5 C75** — enqueue from an AI-attributed `{name, args}` tool-call shape
+   * (what the safety boundary intercepts at `connections:call`). Parses via
+   * {@link fromToolCall}; returns the queued id on success, `null` if the
+   * tool name is not one this plugin understands (the chat view surfaces "no
+   * plugin can render this op" in that case).
+   */
+  enqueueFromAi: (
+    connectionId: string,
+    toolCall: { name: string; args: Record<string, unknown> },
+    source: { type: 'ai'; conversationId: string; agentId?: string },
+  ) => string | null;
   remove: (connectionId: string, id: string) => void;
   clear: (connectionId: string) => void;
   setAutoCommit: (on: boolean) => void;
@@ -73,15 +94,24 @@ export const usePendingStore = create<PendingState>((set, get) => ({
   queues: new Map(),
   autoCommit: false,
 
-  enqueue: (connectionId, op) => {
+  enqueue: (connectionId, op, source) => {
     const id = newId();
     set((s) => {
       const next = new Map(s.queues);
       const cur = next.get(connectionId) ?? [];
-      next.set(connectionId, [...cur, { id, op, status: 'pending' }]);
+      next.set(connectionId, [
+        ...cur,
+        { id, op, status: 'pending', ...(source ? { source } : {}) },
+      ]);
       return { queues: next };
     });
     return id;
+  },
+
+  enqueueFromAi: (connectionId, toolCall, source) => {
+    const op = fromToolCall(toolCall.name, toolCall.args);
+    if (!op) return null;
+    return get().enqueue(connectionId, op, source);
   },
 
   remove: (connectionId, id) =>

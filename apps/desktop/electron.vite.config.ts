@@ -8,9 +8,19 @@ const sharedAlias = { '@shared': resolve('src/shared') };
 // The workspace package @mcp-studio/mcp-client (and, transitively, the ESM
 // @modelcontextprotocol/sdk) must be bundled into the main process, not
 // externalized — the main bundle is CJS and Electron's Node can't require() ESM.
+//
+// M5 C75 adds @mcp-studio/niagara/manifest + @mcp-studio/plugin-api to the
+// same exclude list: main's safety-boundary annotation registry imports the
+// plugin manifests directly (pure data, no React) so the AI-write predicate
+// runs without a renderer round-trip. The manifest's transitive imports
+// (zod, the type-only references) are bundled too.
 const main = {
   resolve: { alias: sharedAlias },
-  plugins: [externalizeDepsPlugin({ exclude: ['@mcp-studio/mcp-client'] })],
+  plugins: [
+    externalizeDepsPlugin({
+      exclude: ['@mcp-studio/mcp-client', '@mcp-studio/niagara', '@mcp-studio/plugin-api'],
+    }),
+  ],
 };
 
 export default defineConfig({

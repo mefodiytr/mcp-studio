@@ -9,16 +9,39 @@ import { z } from 'zod';
  * validates the results it cares about.
  */
 
+/** Structural Tool-annotations shape used in the manifest (defined inline here
+ *  to keep the type-only dependency direction one-way — the manifest schema
+ *  must not depend on the runtime exports below). Mirror of {@link ToolAnnotations}. */
+const toolAnnotationsObjectSchema = z
+  .object({
+    title: z.string().optional(),
+    readOnlyHint: z.boolean().optional(),
+    destructiveHint: z.boolean().optional(),
+    idempotentHint: z.boolean().optional(),
+    openWorldHint: z.boolean().optional(),
+  })
+  .partial();
+
 /** A plugin's identity + which servers it specializes (matched against
  *  `serverInfo.name`). `matches` is a `RegExp` for build-time plugins; a string
  *  is accepted and coerced to a `RegExp` (for a future manifest.json form).
  *  `title` is the human-readable label the host shows (badges, "specialized by"
- *  hints); falls back to `name`. */
+ *  hints); falls back to `name`.
+ *
+ *  **M5 C75** — the manifest carries `toolAnnotationOverrides` so the
+ *  main-process annotation registry can resolve effective annotations without
+ *  a renderer round-trip (the AI-write safety boundary at `ConnectionManager.
+ *  callTool` consults it). The renderer's `applyAnnotationOverrides` reads
+ *  from the manifest's table — single source of truth, no drift. */
 export const pluginManifestSchema = z.object({
   name: z.string().min(1),
   version: z.string().min(1),
   title: z.string().min(1).optional(),
   matches: z.union([z.instanceof(RegExp), z.string().min(1)]),
+  /** tool-name → annotation overlay onto the server's advertised
+   *  `tools/list` annotations. Pure data — no functions — so main can import
+   *  the manifest directly without dragging in renderer-side React. */
+  toolAnnotationOverrides: z.record(toolAnnotationsObjectSchema).optional(),
 });
 export type PluginManifest = z.infer<typeof pluginManifestSchema>;
 
@@ -162,15 +185,18 @@ export interface Plugin {
   commands?: (ctx: PluginContext) => PluginCommand[];
   /** tool-name → JSON-Schema-ish hint, merged into the generic Tools form. */
   toolSchemaHints?: Record<string, unknown>;
-  /** tool-name → an overlay onto the server's advertised tool annotations
-   *  (see {@link mergeToolAnnotations}). For correcting servers whose
-   *  `tools/list` ships wrong hints — e.g. a write tool marked `readOnlyHint:
-   *  true` — so the host's destructive-confirm gate and badges are accurate.
+  /**
+   * **DEPRECATED in M5 C75** — declare overrides on
+   * {@link PluginManifest.toolAnnotationOverrides} instead. Main can read the
+   * manifest directly (it's pure data), so the AI-write safety boundary at
+   * `ConnectionManager.callTool` consults the manifest's table without a
+   * renderer round-trip. The renderer's `applyAnnotationOverrides` also reads
+   * from the manifest. This runtime field stays as a back-compat fallback for
+   * any plugin that hasn't migrated yet; new plugins should ship overrides on
+   * the manifest. The Niagara plugin migrated in C75.
    *
-   *  *Migration note (M5 C75 lifts this onto `PluginManifest` so main's
-   *  `pluginRegistry.getEffectiveAnnotations` can consult it without a
-   *  renderer round-trip — the AI-write safety boundary needs it main-side).
-   *  Until C75 ships the migration, this field is the single source of truth.* */
+   * @deprecated since M5 C75 — use `manifest.toolAnnotationOverrides`.
+   */
   toolAnnotationOverrides?: Record<string, ToolAnnotations>;
 
   /** **M5.** A text fragment appended to the assembled host base system

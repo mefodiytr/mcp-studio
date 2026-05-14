@@ -15,8 +15,8 @@ export function registerConnectionHandlers(manager: ConnectionManager): void {
   handle('connections:tools', async ({ connectionId }) => ({
     tools: await manager.listTools(connectionId),
   }));
-  handle('connections:call', ({ connectionId, toolName, args, write }) =>
-    manager.callTool(connectionId, toolName, args, write),
+  handle('connections:call', ({ connectionId, toolName, args, write, caller }) =>
+    manager.callTool(connectionId, toolName, args, { write, caller }),
   );
   handle('connections:raw', ({ connectionId, method, params }) => manager.rawRequest(connectionId, method, params));
   handle('connections:resources', async ({ connectionId }) => ({

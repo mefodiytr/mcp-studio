@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, CircleAlert, KeyRound, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
+import { Bot, Check, CircleAlert, KeyRound, Loader2, ShieldAlert, Trash2, X } from 'lucide-react';
 import {
   Button,
   cn,
@@ -162,6 +162,7 @@ const STATUS_CHIP: Record<QueuedOp['status'], string> = {
 
 function OpRow({ item, onRemove, disabled }: { item: QueuedOp; onRemove: () => void; disabled: boolean }) {
   const reversible = isReversible(item.op);
+  const aiSource = typeof item.source === 'object' && item.source.type === 'ai' ? item.source : null;
   return (
     <li className="flex items-start gap-2 p-2">
       <div className="min-w-0 flex-1">
@@ -180,6 +181,15 @@ function OpRow({ item, onRemove, disabled }: { item: QueuedOp; onRemove: () => v
               </>
             )}
           </span>
+          {aiSource && (
+            <span
+              className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-600 dark:text-blue-400"
+              title={`Proposed by AI (conversation ${aiSource.conversationId})`}
+            >
+              <Bot className="size-3" aria-hidden />
+              AI
+            </span>
+          )}
           <span className="truncate font-mono text-xs">{describe(item.op)}</span>
         </p>
         {item.errorMessage && (

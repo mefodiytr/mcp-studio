@@ -129,3 +129,54 @@ describe('usePendingStore — applyAll', () => {
     expect(callTool).not.toHaveBeenCalled();
   });
 });
+
+describe('usePendingStore — M5 C75 AI-source routing', () => {
+  it('enqueueFromAi materializes a known tool-call into a WriteOp tagged with the AI source', () => {
+    const id = usePendingStore.getState().enqueueFromAi(
+      'c1',
+      { name: 'setSlot', args: { ord: 'station:|slot:/X', slotName: 's', value: 42 } },
+      { type: 'ai', conversationId: 'conv-123' },
+    );
+    expect(id).not.toBeNull();
+    const queue = usePendingStore.getState().queues.get('c1') ?? [];
+    expect(queue).toHaveLength(1);
+    expect(queue[0]?.op.type).toBe('setSlot');
+    expect(queue[0]?.source).toEqual({ type: 'ai', conversationId: 'conv-123' });
+    expect(queue[0]?.status).toBe('pending');
+  });
+
+  it('enqueueFromAi returns null for unrenderable tools (no fromToolCall mapping)', () => {
+    const id = usePendingStore.getState().enqueueFromAi(
+      'c1',
+      { name: 'commitStation', args: {} },
+      { type: 'ai', conversationId: 'conv-X' },
+    );
+    expect(id).toBeNull();
+    expect(usePendingStore.getState().queues.get('c1')).toBeUndefined();
+  });
+
+  it('enqueue (direct) without a source leaves the source absent — back-compat for human callsites', () => {
+    const id = usePendingStore.getState().enqueue('c1', op());
+    const item = usePendingStore.getState().queues.get('c1')?.find((q) => q.id === id);
+    expect(item?.source).toBeUndefined();
+  });
+
+  it('enqueue accepts an explicit human source as well', () => {
+    const id = usePendingStore.getState().enqueue('c1', op(), 'human');
+    const item = usePendingStore.getState().queues.get('c1')?.find((q) => q.id === id);
+    expect(item?.source).toBe('human');
+  });
+
+  it('AI-proposed and human-proposed ops can coexist in one connection queue', () => {
+    usePendingStore.getState().enqueue('c1', op());
+    usePendingStore.getState().enqueueFromAi(
+      'c1',
+      { name: 'setSlot', args: { ord: 'station:|slot:/Y', slotName: 't', value: 7 } },
+      { type: 'ai', conversationId: 'conv-A' },
+    );
+    const queue = usePendingStore.getState().queues.get('c1') ?? [];
+    expect(queue).toHaveLength(2);
+    expect(queue[0]?.source).toBeUndefined();
+    expect(queue[1]?.source).toMatchObject({ type: 'ai' });
+  });
+});

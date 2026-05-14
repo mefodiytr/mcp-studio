@@ -17,12 +17,15 @@ import type {
   ResourceDescriptor,
   ResourceTemplateDescriptor,
 } from '../../shared/domain/resource';
-import type { RawRequestOutcome, ToolCallOutcome } from '../../shared/domain/tool-result';
+import type { ToolAnnotations } from '@mcp-studio/plugin-api';
+
+import type { RawRequestOutcome, ToolCaller, ToolCallOutcome } from '../../shared/domain/tool-result';
 import type { CredentialVault } from '../store/credential-vault';
 import type { ProfileRepository } from '../store/profile-repository';
 import type { ToolHistoryRepository } from '../store/tool-history-repository';
 import { startLoopbackRedirect, type LoopbackRedirect } from '../oauth/redirect';
 import { tokenExpiresAt } from '../oauth/status';
+import { getEffectiveAnnotations, isWriteCall, pickManifest } from '../plugins/manifest-registry';
 import { forceKillTree, type StdioPidTracker } from './pid-tracker';
 import type { ProtocolTap } from './protocol-tap';
 
@@ -39,6 +42,10 @@ interface Managed {
   /** The in-flight OAuth loopback listener — present only while `signing-in`. */
   redirect?: LoopbackRedirect;
   summary: ConnectionSummary;
+  /** **M5 C75** — cached `tools/list` annotations for the safety-boundary
+   *  predicate. Populated lazily on the first AI-attributed call; cleared on
+   *  reconnect. */
+  baseAnnotationsByTool?: Map<string, ToolAnnotations | undefined>;
 }
 
 function transportConfigFor(profile: Profile): TransportConfig {
@@ -284,14 +291,60 @@ export class ConnectionManager {
     connectionId: string,
     toolName: string,
     args?: Record<string, unknown>,
-    /** If `true`, this call mutates server state — attributed in the audit
-     *  trail. The renderer computes this from the *effective* tool annotations
-     *  (post plugin override); main just stores what it's told. */
-    write?: boolean,
+    opts?: {
+      /** If `true`, this call mutates server state — attributed in the audit
+       *  trail. The renderer computes this from the *effective* tool
+       *  annotations (post plugin override); main just stores what it's told.
+       *  Independent of {@link opts.caller} (a `caller:'human'` write still
+       *  gets the audit flag). */
+      write?: boolean;
+      /** **M5 C75** — caller attribution. Absent = `'human'` (every M1–M4
+       *  caller path; back-compat preserved). `{type:'ai', …}` triggers the
+       *  safety boundary below: an effective-write tool call returns
+       *  `pendingEnqueued` instead of dispatching to the MCP SDK; the
+       *  renderer routes the op to the plugin's pending-changes queue. */
+      caller?: ToolCaller;
+    },
   ): Promise<ToolCallOutcome> {
     const managed = this.requireManaged(connectionId);
     const connection = this.requireConnected(connectionId);
+    const caller: ToolCaller = opts?.caller ?? 'human';
     const startedAt = performance.now();
+
+    // ── M5 C75: AI-write safety boundary ──────────────────────────────────
+    // If an AI-attributed caller is invoking what main resolves to an
+    // effective-write tool, route to the renderer's plugin pending-store
+    // instead of dispatching. The MCP SDK is NOT called; the audit trail
+    // records status:'queued' so the operator can see what the agent
+    // proposed.
+    if (typeof caller === 'object' && caller.type === 'ai') {
+      const effective = await this.resolveEffectiveAnnotations(managed, toolName);
+      if (isWriteCall(effective)) {
+        const durationMs = Math.round(performance.now() - startedAt);
+        this.history.add({
+          connectionId,
+          profileId: managed.profileId,
+          serverName: managed.summary.serverInfo?.name ?? null,
+          toolName,
+          args: args ?? {},
+          status: 'queued',
+          result: null,
+          error: null,
+          ts: new Date().toISOString(),
+          durationMs,
+          write: true,
+          actor: caller,
+        });
+        this.onHistoryChanged();
+        return {
+          result: null,
+          error: null,
+          pendingEnqueued: { toolName, args: args ?? {}, attribution: caller },
+        };
+      }
+    }
+    // ── End safety boundary ───────────────────────────────────────────────
+
     let outcome: ToolCallOutcome;
     try {
       outcome = { result: await connection.callTool(toolName, args), error: null };
@@ -319,10 +372,28 @@ export class ConnectionManager {
       error: outcome.error,
       ts: new Date().toISOString(),
       durationMs,
-      ...(write !== undefined ? { write } : {}),
+      ...(opts?.write !== undefined ? { write: opts.write } : {}),
+      ...(typeof caller === 'object' ? { actor: caller } : {}),
     });
     this.onHistoryChanged();
     return outcome;
+  }
+
+  /** Look up the effective (post plugin-override) annotations for one tool on
+   *  one connection. Lazily fetches `tools/list` from the server (cached on
+   *  `managed`) and merges via the manifest registry. Used by the M5 C75
+   *  safety boundary; not exposed externally. */
+  private async resolveEffectiveAnnotations(managed: Managed, toolName: string) {
+    if (!managed.baseAnnotationsByTool) {
+      // First touch — populate the cache from `tools/list`.
+      const tools = await this.requireConnected(managed.connectionId).listTools();
+      managed.baseAnnotationsByTool = new Map(
+        tools.map((t) => [t.name, t.annotations as ToolAnnotations | undefined]),
+      );
+    }
+    const base = managed.baseAnnotationsByTool.get(toolName);
+    const manifest = pickManifest(managed.summary.serverInfo?.name);
+    return getEffectiveAnnotations(manifest, toolName, base);
   }
 
   async listResources(connectionId: string): Promise<ResourceDescriptor[]> {
