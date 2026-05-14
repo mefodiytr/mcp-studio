@@ -34,15 +34,30 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          // Hoist recharts into a shared chunk so the four chart-bearing views
-          // (Tool usage / Niagara History / Niagara Monitor / Performance —
-          // M4 Phase A/B/C/D) all share one ~750 kB recharts load instead of
-          // each one carrying its own copy. Vite would eventually figure this
-          // out once a second consumer landed, but forcing it now keeps lazy
-          // chunks small from day one (consistent with the rest of M1-M3) and
-          // makes the chunk graph explicit, not implicit.
+          // Hoist heavy third-party deps into shared chunks so the lazy
+          // feature views stay small. The pattern is the same in every case:
+          // force the split *before* a second consumer lands, so Rollup has
+          // an explicit chunking instruction from day one rather than
+          // re-planning when a second view lazily imports the same dep.
+          //
+          //   recharts            — Tool usage / Niagara History / Monitor /
+          //                          Performance (M4).
+          //   @anthropic-ai/sdk   — ChatView (M5 C71); a future scheduled-
+          //                          flow / background-agent consumer (M6+)
+          //                          becomes the second.
+          //   react-markdown +    — ChatView (M5 C71) renders assistant
+          //   remark-gfm            messages; a future contextual-help /
+          //                          docs viewer is the natural second.
+          //
+          // The eager renderer drop from M4 (815 → 599 kB once recharts was
+          // hinted) is the precedent: explicit hints let Rollup re-plan the
+          // chunk graph more aggressively even when there's only one
+          // consumer. Tracked for CodeMirror (next BqlView consumer) in
+          // m4-followups.md.
           manualChunks: {
             recharts: ['recharts'],
+            anthropic: ['@anthropic-ai/sdk'],
+            markdown: ['react-markdown', 'remark-gfm'],
           },
         },
       },
