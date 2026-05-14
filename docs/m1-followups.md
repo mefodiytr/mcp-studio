@@ -144,3 +144,15 @@ affect MCP Studio's behaviour against it.
 - **`rotateMcpToken` coordination** — see `docs/milestone-2.md` D5: the
   BearerResolver / user-Bearer write-auth flow (the `mcp:tokenHash` Tag) is **M3**,
   designed there alongside niagaramcp's token-rotation tool.
+- **`getKnowledgeSummary` should return a `knowledgeHash` / `knowledgeVersion`** —
+  Studio's M6 D4 system-prompt enrichment caches the inventory per-`profileId`
+  in main with a 30-minute TTL fallback. Precise invalidation (cache miss only
+  when the knowledge model actually changed) needs a hash or version field on
+  the server's response: Studio includes the last-seen hash in subsequent
+  `getKnowledgeSummary` calls; the server can short-circuit with "unchanged"
+  when matching, or return a fresh payload + new hash. Until then, the
+  30-minute TTL + the fire-and-forget background refresh on warm-cache hits
+  cover the workflow; a knowledge-edit + immediate-chat sequence within the
+  TTL window misses the edit until the next conversation. *(niagaramcp work —
+  small server-side change; unblocks Studio's cache from being arbitrarily
+  conservative.)*

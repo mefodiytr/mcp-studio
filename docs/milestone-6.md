@@ -84,7 +84,7 @@ Three placements:
 
 **Edit semantics — pre-execution only.** Once "Run plan" is clicked the plan is frozen for that run. Mid-run pause + edit is **not M6**; it's an M6-followup. The operator's mid-run lever is Stop (the M5 AbortController path) which cancels the plan + leaves the conversation in a "[stopped by user]" marker state. Cancel-and-redo by editing the plan + re-launching is one click + one launch; matches M5's Regenerate pattern (C79).
 
-### D4 — Knowledge-layer enrichment: **lazy on first turn** (one extra call per conversation, deferred to the first `streamResponse`)
+### D4 — Knowledge-layer enrichment: **lazy on first turn + per-profileId TTL cache in main**
 
 Three triggers for the `getKnowledgeSummary` enrichment call:
 
@@ -92,31 +92,45 @@ Three triggers for the `getKnowledgeSummary` enrichment call:
 - (b) **Lazy on first turn** — defer the call to the chat-runner's first `streamResponse` invocation. The summary is baked into the system prompt for that conversation from turn 1 onward. The cost lands when the operator sends their first message; abandoned conversations skip the call entirely.
 - (c) **Lazy on demand via the LLM** — leave it to the LLM to call `getKnowledgeSummary` itself when needed. This is what M5 already supports (the LLM has the tool in its catalog); the value of (b) over (c) is that the LLM doesn't burn a discovery turn on the obvious "what's here?" first move.
 
-**Recommendation: (b) lazy on first turn.** Cost-aware (the call is amortised across the rest of the conversation; abandoned chats pay nothing); the LLM starts turn 1 already knowing what equipment exists.
+**Recommendation: (b) lazy on first turn + cached in main.** Cost-aware (the call is amortised across the rest of the conversation; abandoned chats pay nothing); the LLM starts turn 1 already knowing what equipment exists.
 
-**Implementation**: `Plugin.systemPrompt(ctx)` becomes `Promise<string | null>` (additive — sync `string | null` returns continue to satisfy the new signature via implicit `Promise.resolve`). `assemblePluginContributions` becomes `async`. The chat-runner awaits the assembled prompt right before the first `streamResponse`; the prompt is cached for the rest of the conversation (re-assembly on each turn would re-fire `getKnowledgeSummary` and burn cost).
+**Implementation** (per promt17 D4 extension):
+- `Plugin.systemPrompt(ctx)` becomes `Promise<string | null>` (additive — sync `string | null` returns continue to satisfy the new signature via implicit `Promise.resolve`).
+- `assemblePluginContributions` becomes `async`. The chat-runner awaits the assembled prompt right before the first `streamResponse`.
+- **10-second defensive timeout** on each plugin's `systemPrompt(ctx)` (not 5 s — real niagaramcp stations with large knowledge models take 2–4 s for `getKnowledgeSummary` and the 5 s default would fire too often). On timeout: silent fall-back to the prompt-without-inventory path + a **warning chip in the chat header** ("Knowledge inventory unavailable") so the operator knows the LLM is operating without the enrichment.
+- **Per-`profileId` TTL cache in the main process** (30 min default; configurable via a constant for the dev-iteration case). Cache key: `(profileId, connectionId)` — a reconnect to the same profile re-uses the cached inventory if still warm; a different connection (e.g. failover to a different station) populates a fresh entry.
+- **First-session behaviour**: cache miss → block the chat's first turn up to the 10 s timeout while `getKnowledgeSummary` runs; on success, populate the cache + inject the inventory; on timeout, fall back as above.
+- **Subsequent-session behaviour**: cache hit → use the cached inventory immediately (no blocking) + **fire-and-forget background refresh** (call `getKnowledgeSummary` asynchronously; replace the cached entry on success; the active conversation's prompt isn't reassembled — the operator gets the refreshed version on the next conversation in that profile).
+- **Cache invalidation in v1**: TTL only. A `knowledgeHash` / `knowledgeVersion` field on `getKnowledgeSummary`'s response would let main invalidate precisely on knowledge-model edits without an arbitrary TTL — tracked in `m1-followups.md` as a niagaramcp coordination item.
 
 The Niagara plugin's `systemPrompt(ctx)`:
-1. Calls `ctx.callTool('getKnowledgeSummary', {})`.
+1. Calls `ctx.callTool('getKnowledgeSummary', {})` (which routes through main; main's cache layer transparent).
 2. Formats the result (spaces / equipment_types / equipment counts; a compact list of equipment names + their types).
-3. Returns the M5 system prompt + an injected `## Connected station inventory` section at the end. Cap at ~1k tokens of injected context; truncate with `…and N more` if the model is large.
-4. On call failure (no knowledge layer / network error): returns the M5 prompt unchanged; logs a one-line warning to the console.
+3. Returns the M5 system prompt + an injected `## Connected station inventory` section at the end. Cap at ~1k tokens of injected context; truncate with `… and N more` if the model is large.
+4. On call failure (no knowledge layer / network error): returns the M5 prompt unchanged; logs a one-line warning to the console + the chat header warning chip fires (the host detects the absence of an inventory section + surfaces the chip).
 
-**Cache key**: `(connectionId, knowledge-model-version-hash)`. Re-runs the call when the operator switches connections or reconnects. The cache is renderer-side, scoped to the chat-runner instance — no main-side persistence (a stale model is the operator's problem if they refresh; a typical session is much shorter than a real-world knowledge-model edit cadence).
+**Implementation split (possible)**: C85 may split into C85a (niagara contributions lifted; uses lazy-on-first-turn without cache yet, blocking each first-session call) + C85b (the main-side TTL cache + background-refresh layer). Judgement call at C85-time — if the cache work grows past ~150 LoC + warrants its own tests, splits naturally; otherwise lands as one commit.
 
-### D5 — Conversation summary at head-trim: **hard cap (200 msgs, M5 D3), summarise-then-drop, claude-haiku-4-5 for the summariser**
+### D5 — Conversation summary at head-trim: **hard cap (200 msgs, M5 D3), summarise-then-drop, configurable `summariserModel` (default `'haiku'`)**
 
 Promt16 directs the shape: "Current 200-msg cap drops oldest (M5 D3) — lift to LLM-summarizes-trimmed-prefix-into-single-system-message before dropping". The trigger stays at the M5 hard cap (the soft-cap-on-token-budget alternative is m6-followup if real-world conversations want it); the granularity is drop-block (the rolling-summary alternative would fire summary calls every N turns regardless of need).
+
+**Summariser model configuration** (per promt17 D5 extension):
+- New workspace setting `llm.summariserModel: 'haiku' | 'sonnet' | 'opus' | 'same-as-main'` (default `'haiku'` — 20× cheaper than Opus; summary turns shouldn't burn Opus prices). Tracked in `workspace.json` alongside the existing `llm.provider` field; defaults stay sensible without UI exposure in M6.
+- The escalation path: if real-world summaries lose key context (operators report "the next turn forgot something important"), the m6-followup is to bump the default to `'sonnet'` (3× cheaper than Opus; substantially better fluency than Haiku). UI exposure (a settings dropdown) lands in M7 alongside the multi-provider work.
+- The `'same-as-main'` choice uses whatever model the active conversation is running — useful for parity-debugging the summariser's quality without affecting other conversations.
 
 **Implementation**:
 
 1. `ConversationRepository.append` (main) sees the message count cross the cap (`MAX_MESSAGES_PER_CONVERSATION = 200`, from M5 `shared/domain/conversations.ts`). Instead of slicing off the head silently, it emits a `summary-required` event back to the renderer.
 2. The renderer's chat-runner subscribes; on the event, fires a one-shot LLM call:
-   - **Model**: `claude-haiku-4-5` (20× cheaper than the default `claude-opus-4-7` — summary turns shouldn't burn opus prices; the per-conversation Sonnet ≈ $1 budget would be doubled by an opus summariser).
+   - **Model**: from `workspace.json`'s `llm.summariserModel` setting (default `'haiku'` → `claude-haiku-4-5`).
    - **Prompt**: "Summarise the conversation below in ≤200 tokens. Preserve operator concerns, equipment names, tool calls made, and conclusions. Omit fluff."
    - **Input**: the first N messages getting dropped (head slice).
-3. The summary text replaces the head as a single synthetic `system`-role message: `{role:'assistant', content:[{type:'text', text:'[earlier messages summarised] ...'}], marker:'summary', ...}` — uses the existing `marker` field on `Message` (extended with a `'summary'` variant; M5's `'aborted'`/`'max-turns-reached'`/`'error'` markers continue to work).
+3. The summary text replaces the head as a single synthetic `assistant`-role message: `{role:'assistant', content:[{type:'text', text:'<summary>'}], marker:'summary', ...}` — uses the existing `marker` field on `Message` (extended with a `'summary'` variant; M5's `'aborted'`/`'max-turns-reached'`/`'error'` markers continue to work).
 4. The replaced messages are **deleted** from the persistent log. (Audit-trail concerns are covered by the existing tool-history-repository, which stores tool calls + their results independently of conversations; we don't need to keep the raw chat history for replay.)
+
+**Rendering**: the `'summary'` marker renders as a **collapsible** summary message — collapsed by default with the "— earlier messages summarised —" centered greyed-out marker line; expandable to reveal the summary text (the M5 ToolCallEnvelope pattern lifts cleanly). Operators can click to expand for context recall without the summary dominating the conversation log.
 
 **Cost transparency**: the summary call's usage lands in the UsageBadge totals + accumulates into the conversation's `messages[i].usage` field (the same path M5 C78 already uses). The operator sees the summary call's cost the same way every other turn registers.
 
