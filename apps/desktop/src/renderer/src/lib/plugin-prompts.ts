@@ -62,17 +62,45 @@ Honesty:
 
 const SECTION_JOIN = '\n\n---\n\n';
 
+/** Defensive timeout for an async `Plugin.systemPrompt(ctx)` call. Real
+ *  niagaramcp stations with large knowledge models take 2–4 s for
+ *  `getKnowledgeSummary` (per the M6 D4 cache-extension recon); 10 s gives
+ *  realistic headroom while still capping a misbehaving plugin's blocking
+ *  effect on chat startup. Configurable via `assembleOptions.timeoutMs`. */
+export const SYSTEM_PROMPT_TIMEOUT_MS = 10_000;
+
+export interface AssembleOptions {
+  /** Override the per-plugin systemPrompt timeout (M6 D4 default 10s). */
+  timeoutMs?: number;
+  /** Reported when a plugin's `systemPrompt(ctx)` timed out. The chat view
+   *  surfaces this via a warning chip in the header ("Knowledge inventory
+   *  unavailable") so the operator knows the LLM is operating without the
+   *  enrichment. */
+  onSystemPromptTimeout?: (pluginName: string) => void;
+}
+
 /**
  * Assemble the contributions from every active plugin. `plugins` is the list
  * of plugins whose `manifest.matches` regex matched the current connection's
  * `serverInfo.name` (typically zero or one in M5 — the picker is exact). The
  * host's command palette + chat empty state + ConversationRunner system prompt
  * all read from this single resolution point.
+ *
+ * **M6 C84** — async, to accommodate `Plugin.systemPrompt` returning
+ * `Promise<string | null>` (the Niagara plugin's `getKnowledgeSummary`
+ * enrichment lands in C85). Each plugin's `systemPrompt(ctx)` is awaited
+ * under a defensive timeout (default 10 s); on timeout the plugin's section
+ * is dropped + the optional `onSystemPromptTimeout` callback fires so the
+ * chat view can surface a warning chip. `starterQuestions` and
+ * `diagnosticFlows` stay synchronous (no `Promise` widening; they're
+ * static data plugins compute from constants).
  */
-export function assemblePluginContributions(
+export async function assemblePluginContributions(
   plugins: Plugin[],
   ctx: PluginContext,
-): AssembledContributions {
+  options: AssembleOptions = {},
+): Promise<AssembledContributions> {
+  const timeoutMs = options.timeoutMs ?? SYSTEM_PROMPT_TIMEOUT_MS;
   const pluginSections: string[] = [];
   const starterQuestions: string[] = [];
   const diagnosticFlows: TaggedDiagnosticFlow[] = [];
@@ -80,10 +108,24 @@ export function assemblePluginContributions(
   for (const plugin of plugins) {
     if (plugin.systemPrompt) {
       try {
-        const section = plugin.systemPrompt(ctx);
+        const section = await withTimeout(
+          Promise.resolve(plugin.systemPrompt(ctx)),
+          timeoutMs,
+          plugin.manifest.name,
+        );
         if (section && section.trim().length > 0) pluginSections.push(section.trim());
-      } catch {
-        // A misbehaving plugin shouldn't break the chat — drop its section.
+      } catch (err) {
+        // Two failure modes: (1) the plugin threw synchronously or returned
+        // a rejected promise; (2) the timeout fired. The latter surfaces the
+        // callback so the chat header can render a "Knowledge inventory
+        // unavailable" chip; the former is silently dropped — a plugin
+        // shouldn't be able to block chat startup with a thrown error.
+        if (err instanceof PluginSystemPromptTimeoutError) {
+          options.onSystemPromptTimeout?.(err.pluginName);
+        }
+        // Either way, the plugin's section doesn't make it into the assembled
+        // prompt; the operator still gets the host base prompt + other
+        // plugins' sections.
       }
     }
     if (plugin.starterQuestions) {
@@ -118,6 +160,76 @@ export function assemblePluginContributions(
     starterQuestions: starterQuestions.slice(0, MAX_STARTER_QUESTIONS),
     diagnosticFlows,
   };
+}
+
+/**
+ * Synchronous subset — just the static contributions (starter chips +
+ * diagnostic flows). The system prompt isn't here because it can now be
+ * async (M6 C84); callers needing only the UI-render subset (chat empty
+ * state, command palette flow registry) use this sync helper to avoid the
+ * full async path.
+ *
+ * The chat view's runner-launch path (`handleSend` / `handleRunPlan`)
+ * AWAITS the full {@link assemblePluginContributions} right before invoking
+ * the runner — that's the natural async entry point.
+ */
+export function collectStaticContributions(
+  plugins: Plugin[],
+  ctx: PluginContext,
+): { starterQuestions: string[]; diagnosticFlows: TaggedDiagnosticFlow[] } {
+  const starterQuestions: string[] = [];
+  const diagnosticFlows: TaggedDiagnosticFlow[] = [];
+  for (const plugin of plugins) {
+    if (plugin.starterQuestions) {
+      try {
+        for (const q of plugin.starterQuestions(ctx)) {
+          if (typeof q === 'string' && q.trim().length > 0) starterQuestions.push(q.trim());
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (plugin.diagnosticFlows) {
+      try {
+        for (const f of plugin.diagnosticFlows(ctx)) {
+          diagnosticFlows.push({ ...f, pluginName: plugin.manifest.name });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return {
+    starterQuestions: starterQuestions.slice(0, MAX_STARTER_QUESTIONS),
+    diagnosticFlows,
+  };
+}
+
+/** Distinguish "the plugin's systemPrompt timed out" from other rejection
+ *  causes so the host can surface a different UI (the warning chip). */
+export class PluginSystemPromptTimeoutError extends Error {
+  constructor(public readonly pluginName: string, ms: number) {
+    super(`Plugin "${pluginName}" systemPrompt(ctx) timed out after ${ms}ms`);
+    this.name = 'PluginSystemPromptTimeoutError';
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, pluginName: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new PluginSystemPromptTimeoutError(pluginName, ms));
+    }, ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      },
+    );
+  });
 }
 
 /** Substitute `${name}` tokens in a flow's prompt with the launcher's

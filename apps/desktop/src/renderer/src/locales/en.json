@@ -73,6 +73,8 @@
     "flowRun": "Run",
     "flowCancel": "Cancel",
     "regenerate": "Regenerate",
+    "systemPromptTimeoutBadge": "Knowledge inventory unavailable",
+    "systemPromptTimeoutTitle": "Couldn't load the connected server's knowledge inventory in time ({{plugins}}). The assistant is operating without it; subsequent conversations retry the lookup.",
     "plan": {
       "stepCount": "{{count}} steps",
       "summary": "{{done}}/{{total}} done · {{skipped}} skipped · {{errored}} failed",

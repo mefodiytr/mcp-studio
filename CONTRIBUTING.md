@@ -94,6 +94,20 @@ See `docs/milestone-1.md` / `milestone-2.md` for worked examples (plan + the "Ad
   dynamic-length series** (M4 C64). Use `useQueries` from React Query
   for the dynamic-length case; ordinary `useQuery` only inside fixed-
   shape components.
+- **Tool-argument substitution must preserve typed values for
+  whole-token args** (M6 C82 — `substituteValue` invariant). When
+  substituting `${var.path}` into structured tool-call args, a
+  *whole-token* input string (`"${param.limit}"` standalone) returns
+  the bound typed value (e.g. `5` not `"5"`); a *mixed-form* input
+  (`"ord-${param.suffix}"`) interpolates as a string. Wrong
+  implementation — stringifying everything — breaks tool schemas
+  that expect typed args (most niagaramcp tools take `limit:
+  integer`, `force: boolean`, `points: array`, etc.) and the SDK's
+  zod validator rejects the call. Future plugin authors writing
+  similar substitution helpers (M8 visual flow builder editing flow
+  step args interactively will be the next consumer) hit the same
+  correctness requirement; the `substituteValue` helper in
+  `@mcp-studio/plugin-api` is the canonical implementation.
 
 ## Coverage ratchet
 

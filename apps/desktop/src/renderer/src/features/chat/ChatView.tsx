@@ -30,6 +30,7 @@ import { buildPluginContext } from '@renderer/lib/plugin-context';
 import { callTool, useTools } from '@renderer/lib/tools';
 import {
   assemblePluginContributions,
+  collectStaticContributions,
   HOST_BASE_SYSTEM_PROMPT,
   substituteFlowPrompt,
   type TaggedDiagnosticFlow,
@@ -103,14 +104,14 @@ export function ChatView() {
     [conversations, activeId],
   );
 
-  // Assembled plugin contributions for the active connection (system prompt,
-  // starter questions, diagnostic flows). Stable for the connection — no
-  // re-assembly on every keystroke. C73 ships the pipeline; C74 lands the
-  // Niagara plugin's contributions.
+  // Static plugin contributions (starter chips + diagnostic flows) — sync;
+  // used by the empty-state UI + the command palette + the plan launcher.
+  // The full system-prompt assembly (async — may call ctx.callTool for
+  // enrichment per M6 C84) is awaited at runner-launch time inside
+  // handleSend / handleRunPlan, not on every render.
   const contributions = useMemo(() => {
     if (!active) {
       return {
-        systemPrompt: HOST_BASE_SYSTEM_PROMPT,
         starterQuestions: [] as string[],
         diagnosticFlows: [] as TaggedDiagnosticFlow[],
       };
@@ -118,13 +119,35 @@ export function ChatView() {
     const plugin = pickPlugin(active.serverInfo);
     if (!plugin) {
       return {
-        systemPrompt: HOST_BASE_SYSTEM_PROMPT,
         starterQuestions: [] as string[],
         diagnosticFlows: [] as TaggedDiagnosticFlow[],
       };
     }
     const ctx = buildPluginContext(active);
-    return assemblePluginContributions([plugin], ctx);
+    return collectStaticContributions([plugin], ctx);
+  }, [active]);
+
+  // M6 C84 — "Knowledge inventory unavailable" warning chip in the chat
+  // header. Lifts when a plugin's async systemPrompt(ctx) times out at
+  // assemble time (the M6 D4 lazy-first-turn enrichment for niagaramcp's
+  // getKnowledgeSummary). Cleared on the next conversation switch.
+  const [systemPromptWarnings, setSystemPromptWarnings] = useState<string[]>([]);
+
+  // Helper to build the full async system prompt at runner-launch time.
+  // Memoised on `active` so handleSend / handleRunPlan get the same
+  // function identity per active connection.
+  const buildSystemPrompt = useCallback(async (): Promise<string> => {
+    if (!active) return HOST_BASE_SYSTEM_PROMPT;
+    const plugin = pickPlugin(active.serverInfo);
+    if (!plugin) return HOST_BASE_SYSTEM_PROMPT;
+    const ctx = buildPluginContext(active);
+    setSystemPromptWarnings([]);
+    const out = await assemblePluginContributions([plugin], ctx, {
+      onSystemPromptTimeout: (pluginName) => {
+        setSystemPromptWarnings((prev) => (prev.includes(pluginName) ? prev : [...prev, pluginName]));
+      },
+    });
+    return out.systemPrompt;
   }, [active]);
 
   // API-key gate
@@ -252,9 +275,10 @@ export function ChatView() {
         role: 'user',
         content: [{ type: 'text', text }],
       });
+      const systemPrompt = await buildSystemPrompt();
       const gen = runReAct({
         provider,
-        system: contributions.systemPrompt,
+        system: systemPrompt,
         history,
         tools: llmTools,
         dispatchTool: async (name, args) => {
@@ -383,7 +407,7 @@ export function ChatView() {
     hasKey,
     activeId,
     activeConversation,
-    contributions.systemPrompt,
+    buildSystemPrompt,
     llmTools,
     active?.connectionId,
     upsert,
@@ -528,10 +552,11 @@ export function ChatView() {
       const mode = providerMode ?? 'anthropic';
       const provider = await createProvider(mode);
       const history = mapHistoryForProvider(activeConversation?.messages ?? []);
+      const systemPrompt = await buildSystemPrompt();
 
       const gen = runPlan({
         provider,
-        system: contributions.systemPrompt,
+        system: systemPrompt,
         history,
         flowId: flow.id,
         plan,
@@ -707,7 +732,7 @@ export function ChatView() {
     hasKey,
     active?.connectionId,
     activeConversation,
-    contributions.systemPrompt,
+    buildSystemPrompt,
     llmTools,
     appendMessage,
   ]);
@@ -805,6 +830,16 @@ export function ChatView() {
               {providerMode === 'mock' && (
                 <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
                   {t('chat.mockBadge')}
+                </span>
+              )}
+              {systemPromptWarnings.length > 0 && (
+                <span
+                  className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300"
+                  title={t('chat.systemPromptTimeoutTitle', {
+                    plugins: systemPromptWarnings.join(', '),
+                  })}
+                >
+                  {t('chat.systemPromptTimeoutBadge')}
                 </span>
               )}
             </p>

@@ -8,7 +8,7 @@ import { connectProfile, disconnectConnection, useConnections } from '@renderer/
 import { describeError } from '@renderer/lib/errors';
 import { clearHistory, useHistory } from '@renderer/lib/history';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
-import { assemblePluginContributions } from '@renderer/lib/plugin-prompts';
+import { collectStaticContributions } from '@renderer/lib/plugin-prompts';
 import { useProfiles } from '@renderer/lib/profiles';
 import { useTheme } from '@renderer/lib/theme';
 import { callTool } from '@renderer/lib/tools';
@@ -194,7 +194,9 @@ export function useAppCommands({
       // enqueues the flow into the chat-side launcher (the dialog opens; the
       // user fills params; the ReAct loop fires).
       const flowGroup = t('commandPalette.group.assistant');
-      const contributions = assemblePluginContributions([plugin], ctx);
+      // Palette needs only the static subset — the async system prompt
+      // (M6 C84) is awaited at runner-launch time, not here.
+      const contributions = collectStaticContributions([plugin], ctx);
       for (const flow of contributions.diagnosticFlows) {
         list.push({
           id: `assistant.flow.${flow.id}`,

@@ -416,15 +416,24 @@ export interface Plugin {
    */
   toolAnnotationOverrides?: Record<string, ToolAnnotations>;
 
-  /** **M5.** A text fragment appended to the assembled host base system
-   *  prompt when this plugin's connection is active. Returns null to opt
-   *  out for this connection. Sections from multiple active plugins are
-   *  joined with `\n\n---\n\n`.
+  /** **M5 (M6 — widened to async).** A text fragment appended to the
+   *  assembled host base system prompt when this plugin's connection is
+   *  active. Returns null to opt out for this connection. Sections from
+   *  multiple active plugins are joined with `\n\n---\n\n`.
    *
    *  Use for: domain idioms the LLM needs to operate without false starts —
    *  the niagaramcp plugin contributes ORD format, knowledge layer
-   *  semantics, BQL syntax wart, boolean-localization heads-up, etc. */
-  systemPrompt?: (ctx: PluginContext) => string | null;
+   *  semantics, BQL syntax wart, boolean-localization heads-up, etc.
+   *
+   *  **M6 C84** — return type widened to `Promise<string | null>` so plugins
+   *  can call `ctx.callTool(...)` for live-server enrichment (the Niagara
+   *  plugin's `getKnowledgeSummary` enrichment, C85). Synchronous returns
+   *  continue to satisfy the new signature via implicit `Promise.resolve`,
+   *  so M5 plugin code keeps compiling unchanged. The host's
+   *  `assemblePluginContributions` enforces a defensive timeout (10s
+   *  default per M6 D4) so a misbehaving plugin can't block chat startup
+   *  indefinitely. */
+  systemPrompt?: (ctx: PluginContext) => string | null | Promise<string | null>;
 
   /** **M5.** Suggested first messages — chips in the empty-conversation
    *  state. Plugins should contribute domain-relevant questions; static
