@@ -72,6 +72,20 @@
     "diagnosticFlowsHeading": "Diagnostic flows",
     "flowRun": "Run",
     "flowCancel": "Cancel",
+    "usage": {
+      "aria": "Conversation usage: {{tokens}} tokens, approximately {{cost}}",
+      "tokensSuffix": "tokens",
+      "tooltipTitle": "Conversation usage",
+      "input": "Input",
+      "output": "Output",
+      "total": "Total",
+      "model": "Model",
+      "cost": "Cost (approx.)",
+      "warnNearCap": "{{pct}}% of the {{cap}}-token soft cap. Consider summarising or starting a new conversation soon.",
+      "warnOverCap": "Past the {{cap}}-token soft cap. Context may be heavy; sending still works but expect higher per-turn cost.",
+      "unknownModel": "Model not in the local price table — priced at the highest known tier.",
+      "disclaimer": "Cost approximate; Anthropic prices as of {{date}}."
+    },
     "marker": {
       "aborted": "stopped by user",
       "max-turns-reached": "reasoning limit reached",

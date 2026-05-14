@@ -37,6 +37,7 @@ import { useDiagnosticFlowLauncher } from '@renderer/stores/diagnostic-flow-laun
 
 import { ConversationList } from './ConversationList';
 import { MessageView, type InlineToolResult } from './MessageView';
+import { UsageBadge } from './UsageBadge';
 
 function bridge(): NonNullable<typeof window.studio> {
   if (!window.studio) throw new Error('IPC bridge unavailable');
@@ -273,6 +274,10 @@ export function ChatView() {
 
       const assistantContent: ContentBlock[] = [];
       let textBuf = '';
+      // C78 — capture the last `message-stop` usage so the persisted
+      // assistant message carries the token count + the UsageBadge totals
+      // it across the conversation.
+      let lastTurnUsage: { inputTokens: number; outputTokens: number } | undefined;
       let result = await gen.next();
       while (!result.done) {
         const ev = result.value as RunnerEvent;
@@ -292,6 +297,8 @@ export function ChatView() {
             name: ev.name,
             input: ev.input,
           });
+        } else if (ev.type === 'message-stop') {
+          lastTurnUsage = ev.usage;
         } else if (ev.type === 'aborted') {
           await appendMessage(profileId, conversationId, {
             id: `m_${Date.now()}`,
@@ -299,6 +306,7 @@ export function ChatView() {
             content: assistantContent,
             marker: 'aborted',
             ts: Date.now(),
+            ...(lastTurnUsage ? { usage: lastTurnUsage } : {}),
           });
           break;
         } else if (ev.type === 'max-turns-reached') {
@@ -308,18 +316,23 @@ export function ChatView() {
             content: assistantContent,
             marker: 'max-turns-reached',
             ts: Date.now(),
+            ...(lastTurnUsage ? { usage: lastTurnUsage } : {}),
           });
           break;
         } else if (ev.type === 'turn-stop') {
-          // Persist this turn's assistant message; clear local buffers.
+          // Persist this turn's assistant message; clear local buffers. The
+          // cumulative `message-stop` usage carried on this turn lands on the
+          // persisted message (C78 — feeds the UsageBadge).
           if (assistantContent.length > 0) {
             await appendMessage(profileId, conversationId, {
               id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
               role: 'assistant',
               content: [...assistantContent],
               ts: Date.now(),
+              ...(lastTurnUsage ? { usage: lastTurnUsage } : {}),
             });
             assistantContent.length = 0;
+            lastTurnUsage = undefined;
           }
         }
         result = await gen.next();
@@ -409,16 +422,19 @@ export function ChatView() {
         onDelete={handleDelete}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b p-3">
-          <h1 className="text-sm font-medium">{activeConversation?.title ?? t('chat.newConversation')}</h1>
-          <p className="text-xs text-muted-foreground">
-            {t('chat.scope', { server: active?.serverInfo?.name ?? active?.profileId ?? '' })}
-            {providerMode === 'mock' && (
-              <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
-                {t('chat.mockBadge')}
-              </span>
-            )}
-          </p>
+        <header className="flex items-start justify-between gap-3 border-b p-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-medium">{activeConversation?.title ?? t('chat.newConversation')}</h1>
+            <p className="text-xs text-muted-foreground">
+              {t('chat.scope', { server: active?.serverInfo?.name ?? active?.profileId ?? '' })}
+              {providerMode === 'mock' && (
+                <span className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300">
+                  {t('chat.mockBadge')}
+                </span>
+              )}
+            </p>
+          </div>
+          {activeConversation && <UsageBadge conversation={activeConversation} />}
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {!activeConversation || activeConversation.messages.length === 0 ? (
