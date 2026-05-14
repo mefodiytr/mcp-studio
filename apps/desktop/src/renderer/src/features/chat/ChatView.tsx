@@ -7,14 +7,31 @@ import { runReAct, type LlmMessage, type LlmTool, type RunnerEvent } from '@mcp-
 import type { Conversation, ContentBlock, Message } from '../../../../shared/domain/conversations';
 
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@renderer/components/ui/dialog';
 import { Input } from '@renderer/components/ui/input';
 import { useConnections } from '@renderer/lib/connections';
 import { createProvider, pickActiveProviderMode } from '@renderer/lib/llm-provider-factory';
+import { buildPluginContext } from '@renderer/lib/plugin-context';
+import {
+  assemblePluginContributions,
+  HOST_BASE_SYSTEM_PROMPT,
+  substituteFlowPrompt,
+  type TaggedDiagnosticFlow,
+} from '@renderer/lib/plugin-prompts';
 import { cn } from '@renderer/lib/utils';
+import { pickPlugin } from '@renderer/plugins/registry';
 import {
   selectConversations,
   useConversationsStore,
 } from '@renderer/stores/conversations';
+import { useDiagnosticFlowLauncher } from '@renderer/stores/diagnostic-flow-launcher';
 
 import { ConversationList } from './ConversationList';
 import { MessageView, type InlineToolResult } from './MessageView';
@@ -60,9 +77,40 @@ export function ChatView() {
     [conversations, activeId],
   );
 
+  // Assembled plugin contributions for the active connection (system prompt,
+  // starter questions, diagnostic flows). Stable for the connection — no
+  // re-assembly on every keystroke. C73 ships the pipeline; C74 lands the
+  // Niagara plugin's contributions.
+  const contributions = useMemo(() => {
+    if (!active) {
+      return {
+        systemPrompt: HOST_BASE_SYSTEM_PROMPT,
+        starterQuestions: [] as string[],
+        diagnosticFlows: [] as TaggedDiagnosticFlow[],
+      };
+    }
+    const plugin = pickPlugin(active.serverInfo);
+    if (!plugin) {
+      return {
+        systemPrompt: HOST_BASE_SYSTEM_PROMPT,
+        starterQuestions: [] as string[],
+        diagnosticFlows: [] as TaggedDiagnosticFlow[],
+      };
+    }
+    const ctx = buildPluginContext(active);
+    return assemblePluginContributions([plugin], ctx);
+  }, [active]);
+
   // API-key gate
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [providerMode, setProviderMode] = useState<'mock' | 'anthropic' | null>(null);
+
+  // Diagnostic-flow launcher (filled by clicking a flow chip from the empty
+  // state or a palette command).
+  const [flowLauncher, setFlowLauncher] = useState<{
+    flow: TaggedDiagnosticFlow;
+    paramValues: Record<string, string>;
+  } | null>(null);
 
   // Streaming state
   const [streamingText, setStreamingText] = useState('');
@@ -114,12 +162,12 @@ export function ChatView() {
     abortRef.current?.abort();
   }, []);
 
-  const handleSend = useCallback(async () => {
-    const text = userInput.trim();
+  const handleSend = useCallback(async (override?: string) => {
+    const text = (override ?? userInput).trim();
     if (!text || !profileId || running) return;
     if (providerMode === 'anthropic' && hasKey === false) return;
     setRunning(true);
-    setUserInput('');
+    if (!override) setUserInput('');
 
     let conversationId = activeId;
     // New conversation? Create it now.
@@ -164,7 +212,7 @@ export function ChatView() {
       const tools: LlmTool[] = [];
       const gen = runReAct({
         provider,
-        system: 'You are a helpful assistant inside MCP Studio.',
+        system: contributions.systemPrompt,
         history,
         tools,
         dispatchTool: async () => {
@@ -252,10 +300,42 @@ export function ChatView() {
     hasKey,
     activeId,
     activeConversation,
+    contributions.systemPrompt,
     upsert,
     appendMessage,
     patchInflight,
   ]);
+
+  // Run a diagnostic flow (or a starter chip): substitute params, fire send.
+  const handleRunFlow = useCallback(
+    async (flow: TaggedDiagnosticFlow, params: Record<string, string> = {}) => {
+      const prompt = substituteFlowPrompt(flow.prompt, params);
+      setFlowLauncher(null);
+      await handleSend(prompt);
+    },
+    [handleSend],
+  );
+
+  const handleLaunchFlow = useCallback((flow: TaggedDiagnosticFlow) => {
+    if (!flow.params || flow.params.length === 0) {
+      void handleRunFlow(flow, {});
+      return;
+    }
+    const initial: Record<string, string> = {};
+    for (const p of flow.params) initial[p.name] = '';
+    setFlowLauncher({ flow, paramValues: initial });
+  }, [handleRunFlow]);
+
+  // Consume palette-enqueued flow launches (the cross-cut between
+  // useAppCommands' "Run diagnostic flow: …" command + the chat view's
+  // launcher dialog).
+  const pendingFlow = useDiagnosticFlowLauncher((s) => s.pending);
+  const consumePendingFlow = useDiagnosticFlowLauncher((s) => s.consume);
+  useEffect(() => {
+    if (!pendingFlow) return;
+    const flow = consumePendingFlow();
+    if (flow) handleLaunchFlow(flow);
+  }, [pendingFlow, consumePendingFlow, handleLaunchFlow]);
 
   if (!profileId) {
     return (
@@ -295,6 +375,10 @@ export function ChatView() {
               providerMode={providerMode}
               hasKey={hasKey}
               onKeySaved={() => setHasKey(true)}
+              starterQuestions={contributions.starterQuestions}
+              diagnosticFlows={contributions.diagnosticFlows}
+              onPickStarter={(text) => void handleSend(text)}
+              onLaunchFlow={handleLaunchFlow}
             />
           ) : (
             activeConversation.messages.map((m, i) => {
@@ -334,7 +418,7 @@ export function ChatView() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void handleSend();
+              void handleSend(undefined);
             }}
             className="flex items-center gap-2"
           >
@@ -364,7 +448,76 @@ export function ChatView() {
           </form>
         </footer>
       </div>
+      <FlowLauncherDialog
+        launcher={flowLauncher}
+        onClose={() => setFlowLauncher(null)}
+        onSubmit={(flow, values) => void handleRunFlow(flow, values)}
+        onChange={(values) =>
+          setFlowLauncher((prev) => (prev ? { ...prev, paramValues: values } : prev))
+        }
+      />
     </div>
+  );
+}
+
+function FlowLauncherDialog({
+  launcher,
+  onClose,
+  onSubmit,
+  onChange,
+}: {
+  launcher: { flow: TaggedDiagnosticFlow; paramValues: Record<string, string> } | null;
+  onClose: () => void;
+  onSubmit: (flow: TaggedDiagnosticFlow, values: Record<string, string>) => void;
+  onChange: (values: Record<string, string>) => void;
+}) {
+  const { t } = useTranslation();
+  if (!launcher) return null;
+  const { flow, paramValues } = launcher;
+  const params = flow.params ?? [];
+  const canSubmit = params.every((p) => (paramValues[p.name] ?? '').trim().length > 0);
+  return (
+    <Dialog open={!!launcher} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{flow.title}</DialogTitle>
+          <DialogDescription>{flow.description}</DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSubmit) onSubmit(flow, paramValues);
+          }}
+        >
+          {params.map((p) => (
+            <div key={p.name}>
+              <label
+                htmlFor={`flow-${flow.id}-${p.name}`}
+                className="mb-1 block text-xs font-medium text-muted-foreground"
+              >
+                {p.label}
+              </label>
+              <Input
+                id={`flow-${flow.id}-${p.name}`}
+                value={paramValues[p.name] ?? ''}
+                onChange={(e) => onChange({ ...paramValues, [p.name]: e.target.value })}
+                placeholder={p.placeholder}
+                autoFocus
+              />
+            </div>
+          ))}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {t('chat.flowCancel')}
+            </Button>
+            <Button type="submit" disabled={!canSubmit}>
+              {t('chat.flowRun')}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -372,10 +525,18 @@ function EmptyState({
   providerMode,
   hasKey,
   onKeySaved,
+  starterQuestions,
+  diagnosticFlows,
+  onPickStarter,
+  onLaunchFlow,
 }: {
   providerMode: 'mock' | 'anthropic' | null;
   hasKey: boolean | null;
   onKeySaved: () => void;
+  starterQuestions: string[];
+  diagnosticFlows: TaggedDiagnosticFlow[];
+  onPickStarter: (text: string) => void;
+  onLaunchFlow: (flow: TaggedDiagnosticFlow) => void;
 }) {
   const { t } = useTranslation();
   const [keyInput, setKeyInput] = useState('');
@@ -419,6 +580,46 @@ function EmptyState({
             </Button>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">{t('chat.apiKeyHelp')}</p>
+        </div>
+      )}
+      {!needsKey && diagnosticFlows.length > 0 && (
+        <div className="space-y-2 text-left">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t('chat.diagnosticFlowsHeading')}
+          </h3>
+          <div className="flex flex-wrap justify-start gap-2">
+            {diagnosticFlows.map((flow) => (
+              <Button
+                key={flow.id}
+                variant="outline"
+                size="sm"
+                onClick={() => onLaunchFlow(flow)}
+                title={flow.description}
+              >
+                {flow.title}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      {!needsKey && starterQuestions.length > 0 && (
+        <div className="space-y-2 text-left">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t('chat.starterQuestionsHeading')}
+          </h3>
+          <div className="flex flex-wrap justify-start gap-2">
+            {starterQuestions.map((q, i) => (
+              <Button
+                key={i}
+                variant="ghost"
+                size="sm"
+                className="h-auto whitespace-normal border border-border bg-muted/30 px-3 py-2 text-left text-sm font-normal"
+                onClick={() => onPickStarter(q)}
+              >
+                {q}
+              </Button>
+            ))}
+          </div>
         </div>
       )}
       {!needsKey && (

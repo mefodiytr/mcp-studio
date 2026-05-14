@@ -8,10 +8,12 @@ import { connectProfile, disconnectConnection, useConnections } from '@renderer/
 import { describeError } from '@renderer/lib/errors';
 import { clearHistory, useHistory } from '@renderer/lib/history';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
+import { assemblePluginContributions } from '@renderer/lib/plugin-prompts';
 import { useProfiles } from '@renderer/lib/profiles';
 import { useTheme } from '@renderer/lib/theme';
 import { callTool } from '@renderer/lib/tools';
 import { pickPlugin } from '@renderer/plugins/registry';
+import { useDiagnosticFlowLauncher } from '@renderer/stores/diagnostic-flow-launcher';
 
 import type { AppView } from '@renderer/app/LeftRail';
 import type { ConnectionSummary } from '@shared/domain/connection';
@@ -179,11 +181,31 @@ export function useAppCommands({
 
     // Commands contributed by the active connection's plugin (if any).
     const plugin = pickPlugin(pluginConnection?.serverInfo);
-    if (pluginConnection && plugin?.commands) {
+    if (pluginConnection && plugin) {
       const groupName = pluginConnection.serverInfo?.name ?? plugin.manifest.name;
       const ctx = buildPluginContext(pluginConnection);
-      for (const pc of plugin.commands(ctx)) {
-        list.push({ id: pc.id, title: pc.title, group: pc.group ?? groupName, keywords: pc.keywords, run: pc.run });
+      if (plugin.commands) {
+        for (const pc of plugin.commands(ctx)) {
+          list.push({ id: pc.id, title: pc.title, group: pc.group ?? groupName, keywords: pc.keywords, run: pc.run });
+        }
+      }
+      // M5: diagnostic-flow launchers from the plugin's `diagnosticFlows`. Each
+      // flow becomes a palette entry that navigates to the assistant view +
+      // enqueues the flow into the chat-side launcher (the dialog opens; the
+      // user fills params; the ReAct loop fires).
+      const flowGroup = t('commandPalette.group.assistant');
+      const contributions = assemblePluginContributions([plugin], ctx);
+      for (const flow of contributions.diagnosticFlows) {
+        list.push({
+          id: `assistant.flow.${flow.id}`,
+          title: t('commandPalette.runFlow', { name: flow.title }),
+          group: flowGroup,
+          keywords: `${flow.id} ${flow.title} ${flow.description} ${flow.pluginName} diagnostic flow`,
+          run: () => {
+            setView('assistant');
+            useDiagnosticFlowLauncher.getState().enqueue(flow);
+          },
+        });
       }
     }
 

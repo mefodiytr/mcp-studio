@@ -119,9 +119,43 @@ export interface PluginCommand {
   run: () => void | Promise<void>;
 }
 
+/** A canned multi-step diagnostic flow a plugin contributes to the M5 chat
+ *  view. In M5 the `prompt` is a *templated user message* (free-text with
+ *  `${placeholder}` slots the host's flow-launcher dialog fills in) that the
+ *  ReAct loop walks naturally — D7 recon: plan-and-execute layering on stored
+ *  plan templates is M6. The `params` array describes the placeholders the
+ *  launcher dialog should prompt for; an empty / absent `params` means the
+ *  prompt is sent verbatim. */
+export interface DiagnosticFlow {
+  /** Stable key — used for palette command ids + (M6+) saved-flow refs. */
+  id: string;
+  /** Palette label + dialog heading. */
+  title: string;
+  /** One-line description; tooltip + dialog body. */
+  description: string;
+  /** Templated user-message prompt. `${name}` tokens are substituted from the
+   *  launcher's collected `params`. The host base system prompt + plugin
+   *  systemPrompt have already been assembled — `prompt` is just the user
+   *  message that kicks off the ReAct loop. */
+  prompt: string;
+  /** The placeholders the launcher dialog should prompt for. Empty / absent
+   *  means the prompt has no substitutions; the flow runs as-is. */
+  params?: DiagnosticFlowParam[];
+}
+
+export interface DiagnosticFlowParam {
+  /** Token name — matches `${name}` in the flow's `prompt`. */
+  name: string;
+  /** Field label in the launcher dialog. */
+  label: string;
+  /** Optional placeholder / hint. */
+  placeholder?: string;
+}
+
 /** A plugin = a manifest + the views it contributes, plus optional per-context
- *  commands, tool-name → schema hints for the generic Tools-catalog form, and
- *  tool-name → annotation overrides. */
+ *  commands, tool-name → schema hints for the generic Tools-catalog form,
+ *  tool-name → annotation overrides, and (M5) AI co-pilot contributions
+ *  (system prompt fragment / starter questions / diagnostic flows). */
 export interface Plugin {
   manifest: PluginManifest;
   views: PluginView[];
@@ -131,6 +165,42 @@ export interface Plugin {
   /** tool-name → an overlay onto the server's advertised tool annotations
    *  (see {@link mergeToolAnnotations}). For correcting servers whose
    *  `tools/list` ships wrong hints — e.g. a write tool marked `readOnlyHint:
-   *  true` — so the host's destructive-confirm gate and badges are accurate. */
+   *  true` — so the host's destructive-confirm gate and badges are accurate.
+   *
+   *  *Migration note (M5 C75 lifts this onto `PluginManifest` so main's
+   *  `pluginRegistry.getEffectiveAnnotations` can consult it without a
+   *  renderer round-trip — the AI-write safety boundary needs it main-side).
+   *  Until C75 ships the migration, this field is the single source of truth.* */
   toolAnnotationOverrides?: Record<string, ToolAnnotations>;
+
+  /** **M5.** A text fragment appended to the assembled host base system
+   *  prompt when this plugin's connection is active. Returns null to opt
+   *  out for this connection. Sections from multiple active plugins are
+   *  joined with `\n\n---\n\n`.
+   *
+   *  Use for: domain idioms the LLM needs to operate without false starts —
+   *  the niagaramcp plugin contributes ORD format, knowledge layer
+   *  semantics, BQL syntax wart, boolean-localization heads-up, etc. */
+  systemPrompt?: (ctx: PluginContext) => string | null;
+
+  /** **M5.** Suggested first messages — chips in the empty-conversation
+   *  state. Plugins should contribute domain-relevant questions; static
+   *  strings in v1, richer prompts with ord autocomplete are an m5-followup.
+   *  Host caps at 6 total across all active plugins. */
+  starterQuestions?: (ctx: PluginContext) => string[];
+
+  /** **M5.** Canned diagnostic flows. Surface as command-palette entries
+   *  ("Run diagnostic: <title>") and as a button row in the chat empty
+   *  state. M5 ships flows as templated user prompts (D7); plan-and-execute
+   *  lifts them to stored plan templates in M6. */
+  diagnosticFlows?: (ctx: PluginContext) => DiagnosticFlow[];
+
+  /** **M5 (C75 forward-compat).** Per-plugin claim hook for the AI-write
+   *  safety boundary: when the host intercepts an AI-attributed write tool
+   *  call (D5), it asks each active plugin "can you render this op in your
+   *  pending-changes queue?". The Niagara plugin returns `true` for ops its
+   *  pending-store knows how to enqueue; other plugins return `false`. M5
+   *  exercises only the Niagara plugin; the hook exists to keep the
+   *  contract complete for a second-write-capable-plugin future. */
+  canHandleWrite?: (op: { name: string; args: Record<string, unknown> }) => boolean;
 }

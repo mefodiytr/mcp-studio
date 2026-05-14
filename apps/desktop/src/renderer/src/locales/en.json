@@ -61,6 +61,10 @@
     "toolOutput": "Result",
     "toolQueued": "queued for operator approval",
     "chartStub": "Chart inline rendering — wires up in C76.",
+    "starterQuestionsHeading": "Try asking",
+    "diagnosticFlowsHeading": "Diagnostic flows",
+    "flowRun": "Run",
+    "flowCancel": "Cancel",
     "marker": {
       "aborted": "stopped by user",
       "max-turns-reached": "reasoning limit reached",
@@ -325,12 +329,14 @@
     "clearHistory": "Clear tool-call history",
     "toggleTheme": "Toggle theme",
     "reloadWindow": "Reload window",
+    "runFlow": "Run diagnostic flow: {{name}}",
     "group": {
       "go": "Go to",
       "view": "View",
       "connections": "Connections",
       "tools": "Tools",
-      "history": "History"
+      "history": "History",
+      "assistant": "Assistant"
     }
   }
 }
