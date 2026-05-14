@@ -81,29 +81,35 @@ test('M5 chat → rooftop diagnostic flow walks findEquipment → inspectCompone
   await expect(win.getByRole('heading', { name: /Diagnostic flows/i })).toBeVisible();
   await shot(win, 'm5-chat-empty-state');
 
-  // Click the Rooftop diagnosis flow button → launcher dialog → fill →
-  // Run. (The palette path is equivalent; this exercises the empty-state
-  // button.)
+  // Click the Rooftop diagnosis flow button → launcher dialog (param input)
+  // → fill → Run. **M6 C85** lifted this flow to a structured plan; the
+  // launcher Run no longer kicks the ReAct loop directly — it shows the
+  // inline PlanEditor card with the 5 planned steps.
   await win.getByRole('button', { name: 'Rooftop diagnosis', exact: true }).click();
   const launcher = win.getByRole('dialog').filter({ hasText: 'Rooftop diagnosis' });
   await expect(launcher).toBeVisible();
   await launcher.locator('input').first().fill('rooftop unit 5');
   await launcher.getByRole('button', { name: 'Run', exact: true }).click();
 
-  // The ReAct loop walks four mock turns:
-  //   1) findEquipment    (read)
-  //   2) inspectComponent (read)
-  //   3) getActiveAlarms  (read)
-  //   4) final text + a `chart` code fence
-  // Each tool call appears as a collapsible ToolCallEnvelope; the chart
-  // renders inside the final assistant message. The mock niagara has no
-  // findEquipment / getActiveAlarms handler — it returns its default "no
-  // handler" text back to the runner; the mock LLM doesn't care (programs
-  // are sequence-based, not input-driven), so the e2e is deterministic.
+  // PlanEditor card renders with the 5-step plan: findEquipment →
+  // inspectComponent → getActiveAlarms → readHistory (conditional skip on
+  // alarms.length > 0 — the mock niagara has no getActiveAlarms handler
+  // so `alarms` binds to its default text + length-gt fails + the step
+  // skips) → terminal llm-step (the chart-bearing summary).
+  const planEditor = win.locator('button', { hasText: 'Rooftop diagnosis' }).first();
+  await expect(planEditor).toBeVisible({ timeout: 10_000 });
+  await win.getByRole('button', { name: 'Run plan', exact: true }).click();
+
+  // Each plan step's tool dispatch fires the standard M5 tool-use-start /
+  // tool-use-complete envelope events, so the chat surface shows the same
+  // envelopes the C71 ToolCallEnvelope component renders. The mock niagara
+  // has no findEquipment / inspectComponent / getActiveAlarms handlers —
+  // returns its default "no handler" text; the plan runner doesn't care
+  // (it just binds the result string + moves on).
   //
-  // Each tool name appears transiently in the streaming "Calling X…" card
-  // and permanently in the persisted envelope. `.first()` picks whichever
-  // arrives first (and stays).
+  // Tool names appear in two places: the transient "Calling X…" streaming
+  // card AND the PlanEditor row label. `.first()` picks whichever arrives
+  // first.
   await expect(win.locator('.font-mono').filter({ hasText: 'findEquipment' }).first()).toBeVisible({
     timeout: 20_000,
   });

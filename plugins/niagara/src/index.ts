@@ -7,7 +7,7 @@ import { fromToolCall } from './lib/write-ops';
 import { NIAGARA_MANIFEST } from './manifest';
 import { NIAGARA_STARTER_QUESTIONS } from './starter-questions';
 import { usePendingStore } from './state/pending-store';
-import { NIAGARA_SYSTEM_PROMPT } from './system-prompt';
+import { niagaraSystemPrompt } from './system-prompt';
 import { NIAGARA_TOOL_HINTS } from './tool-hints';
 
 // View bodies are lazy chunks — the plugin's entry (this file, eagerly imported
@@ -63,11 +63,13 @@ export const niagaraPlugin: Plugin = {
   // M5 C75: `toolAnnotationOverrides` migrated onto NIAGARA_MANIFEST (single
   // source of truth so main + renderer agree without a round-trip — see
   // `pluginManifestSchema`).
-  // M5 AI co-pilot contributions (C74). Static for v1 — the system prompt
-  // doesn't depend on the live connection state in M5; M6 may want
-  // ctx.listTools()-driven feature-detection to add "if getTrendAnalysis is
-  // available, prefer it" guidance per handover §7.
-  systemPrompt: () => NIAGARA_SYSTEM_PROMPT,
+  // M5 AI co-pilot contributions (C74); M6 C85 widens systemPrompt to async
+  // and adds the live knowledge-layer inventory (getKnowledgeSummary
+  // injected as an extra section at chat-runner-launch time). The host
+  // enforces the 10-second timeout via `assemblePluginContributions`;
+  // on timeout, the operator sees a "Knowledge inventory unavailable"
+  // chip in the chat header + the LLM operates on the base prompt.
+  systemPrompt: (ctx) => niagaraSystemPrompt(ctx),
   starterQuestions: () => NIAGARA_STARTER_QUESTIONS,
   diagnosticFlows: () => NIAGARA_DIAGNOSTIC_FLOWS,
   // M5 C75: the plugin claims AI-proposed write ops it can render in its

@@ -192,7 +192,7 @@ export async function* runPlan(
         ],
       });
       if (step.bindResultTo) {
-        vars[step.bindResultTo] = result;
+        vars[step.bindResultTo] = extractBoundValue(result);
       }
       yield {
         type: 'plan-step-complete',
@@ -303,6 +303,47 @@ function isAbort(err: unknown): boolean {
     return err.name === 'AbortError' || /aborted/i.test(err.message);
   }
   return false;
+}
+
+/** Extract the structured value to bind into the `vars` map from a raw
+ *  tool-call result. The host-side `dispatchTool` returns whatever shape
+ *  the underlying MCP `tools/call` returned (typically a `CallToolResult`:
+ *  `{content, isError, structuredContent?}`). For variable substitution to
+ *  work cleanly in downstream `${var.path}` references, the plan runner
+ *  unwraps:
+ *    - `structuredContent` (MCP modern shape — used by niagara-mock's
+ *      `ok()` helper) → bind that directly;
+ *    - else if `content[0]` is a text block carrying JSON → parse + bind
+ *      the parsed value;
+ *    - else if `content` is an array of text blocks → bind the concatenated
+ *      text;
+ *    - else → bind the raw result (the M5 fall-through).
+ *
+ *  This unwrap is invisible to LLM steps — they get the JSON-stringified
+ *  raw result threaded back as a `tool_result` block via the chat view's
+ *  `dispatchTool`, so the LLM sees the full original payload regardless of
+ *  what the plan binds for substitution.
+ */
+function extractBoundValue(raw: unknown): unknown {
+  if (raw === null || raw === undefined || typeof raw !== 'object') return raw;
+  const obj = raw as Record<string, unknown>;
+  if ('structuredContent' in obj && obj.structuredContent !== undefined) {
+    return obj.structuredContent;
+  }
+  if ('content' in obj && Array.isArray(obj.content) && obj.content.length > 0) {
+    const first = obj.content[0];
+    if (first && typeof first === 'object' && (first as { type?: unknown }).type === 'text') {
+      const text = (first as { text?: unknown }).text;
+      if (typeof text === 'string') {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return text;
+        }
+      }
+    }
+  }
+  return raw;
 }
 
 function describeCondition(expr: PlanStep['runIf']): string {

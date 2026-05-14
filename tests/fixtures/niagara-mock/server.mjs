@@ -393,6 +393,60 @@ function setupTestUser(args) {
   return ok({ username: String(args?.username ?? ''), bound: true });
 }
 
+// ── M6 knowledge-layer handlers (added in M6 C85 for the plan-based niagara
+// flows; the rooftop + knowledge-summary diagnostic flows depend on these). ──
+
+const KNOWLEDGE_SUMMARY = {
+  spaceCount: 2,
+  equipmentTypeCount: 3,
+  equipmentCount: 4,
+  standalonePointCount: 1,
+  equipmentTypes: [
+    { name: 'AHU', equipmentCount: 2 },
+    { name: 'RTU', equipmentCount: 1 },
+    { name: 'VAV', equipmentCount: 1 },
+  ],
+  equipment: [
+    { name: 'AHU-1', type: 'AHU', ord: 'station:|slot:/Drivers/NiagaraNetwork/AHU1' },
+    { name: 'AHU-2', type: 'AHU', ord: 'station:|slot:/Drivers/NiagaraNetwork/AHU2' },
+    { name: 'RTU-5', type: 'RTU', ord: 'station:|slot:/Drivers/NiagaraNetwork/RTU5' },
+    { name: 'VAV-12', type: 'VAV', ord: 'station:|slot:/Drivers/NiagaraNetwork/VAV12' },
+  ],
+};
+
+function findEquipment(args) {
+  const query = String(args?.query ?? '').toLowerCase();
+  // Pick the first equipment whose name OR type matches the query (case-
+  // insensitive substring). Falls back to the first AHU so plans that
+  // expect a result get something deterministic.
+  const found =
+    KNOWLEDGE_SUMMARY.equipment.find(
+      (e) =>
+        (e.name && e.name.toLowerCase().includes(query)) ||
+        (e.type && e.type.toLowerCase().includes(query)),
+    ) ?? KNOWLEDGE_SUMMARY.equipment[0];
+  return ok({
+    ord: found.ord,
+    displayName: found.name,
+    type: found.type,
+    points: { supply_air_temp: `${found.ord}/SAT` },
+  });
+}
+
+function getActiveAlarms() {
+  // Empty alarms list — the rooftop plan's readHistory step skips when
+  // alarms.length > 0 fails. (Future test scenarios can flip this.)
+  return ok([]);
+}
+
+function getKnowledgeSummary() {
+  return ok(KNOWLEDGE_SUMMARY);
+}
+
+function validateKnowledge() {
+  return ok({ issues: [] });
+}
+
 function callTool(params) {
   switch (params?.name) {
     case 'listChildren':
@@ -425,6 +479,14 @@ function callTool(params) {
       return readPoint(params.arguments);
     case 'readHistory':
       return readHistory(params.arguments);
+    case 'findEquipment':
+      return findEquipment(params.arguments);
+    case 'getActiveAlarms':
+      return getActiveAlarms(params.arguments);
+    case 'getKnowledgeSummary':
+      return getKnowledgeSummary(params.arguments);
+    case 'validateKnowledge':
+      return validateKnowledge(params.arguments);
     default:
       return { isError: false, content: [{ type: 'text', text: `(niagara-mock has no handler for ${params?.name})` }] };
   }

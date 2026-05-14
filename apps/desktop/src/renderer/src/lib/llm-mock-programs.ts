@@ -55,112 +55,26 @@ export const MOCK_PROGRAMS: MockProgram[] = [
 
   {
     id: 'rooftop',
-    // Matches the rooftop-diagnostic flow's first user message ("Investigate
-    // the rooftop unit described by: …") + the operator typing variations.
+    // Matches the rooftop-diagnostic flow's llm-step prompt. **M6 C85** lifts
+    // the niagara rooftop flow to a structured plan (4 tool-call steps that
+    // dispatch directly to niagara — no LLM mediation — then 1 terminal
+    // llm-step that summarises with a chart). This program models the
+    // single terminal llm-step's response: end_turn with the chart-bearing
+    // summary text. The 4 prior tool-call envelopes that the chat-rooftop
+    // e2e observes come from the plan-runner's `tool-use-*` events, not
+    // from the LLM.
+    //
+    // The legacy M5 ReAct-driven 4-turn rooftop walk is no longer used by
+    // any in-box plugin (Niagara migrated in C85). A reborn ReAct rooftop
+    // mock for a contrived test would be additive — m6-followup if a
+    // back-compat regression scenario needs it.
     match: matchUserText('rooftop'),
     turns: [
-      // Turn 1: text rationale + findEquipment.
       {
         events: [
           {
             type: 'message-start',
-            messageId: 'mock_rooftop_1',
-            model: 'mock',
-            usage: { inputTokens: 50, outputTokens: 0 },
-          },
-          {
-            type: 'text-stop',
-            index: 0,
-            text: "I'll start by finding the rooftop unit in the knowledge layer.",
-          },
-          {
-            type: 'tool-use-start',
-            index: 1,
-            toolUseId: 'toolu_mock_find',
-            name: 'findEquipment',
-          },
-          {
-            type: 'tool-use-complete',
-            index: 1,
-            toolUseId: 'toolu_mock_find',
-            name: 'findEquipment',
-            input: { query: 'rooftop' },
-          },
-          {
-            type: 'message-stop',
-            stopReason: 'tool_use',
-            usage: { inputTokens: 50, outputTokens: 20 },
-          },
-        ],
-      },
-      // Turn 2: inspectComponent.
-      {
-        events: [
-          {
-            type: 'message-start',
-            messageId: 'mock_rooftop_2',
-            model: 'mock',
-            usage: { inputTokens: 90, outputTokens: 0 },
-          },
-          {
-            type: 'tool-use-start',
-            index: 0,
-            toolUseId: 'toolu_mock_inspect',
-            name: 'inspectComponent',
-          },
-          {
-            type: 'tool-use-complete',
-            index: 0,
-            toolUseId: 'toolu_mock_inspect',
-            name: 'inspectComponent',
-            input: { ord: 'station:|slot:/Drivers/AHU1' },
-          },
-          {
-            type: 'message-stop',
-            stopReason: 'tool_use',
-            usage: { inputTokens: 90, outputTokens: 15 },
-          },
-        ],
-      },
-      // Turn 3: getActiveAlarms (read-only — the M3 niagara annotations
-      // mark it readOnlyHint:true so the safety boundary lets it through).
-      {
-        events: [
-          {
-            type: 'message-start',
-            messageId: 'mock_rooftop_3',
-            model: 'mock',
-            usage: { inputTokens: 130, outputTokens: 0 },
-          },
-          { type: 'text-stop', index: 0, text: 'Now checking active alarms on this unit.' },
-          {
-            type: 'tool-use-start',
-            index: 1,
-            toolUseId: 'toolu_mock_alarms',
-            name: 'getActiveAlarms',
-          },
-          {
-            type: 'tool-use-complete',
-            index: 1,
-            toolUseId: 'toolu_mock_alarms',
-            name: 'getActiveAlarms',
-            input: { sourceOrdPrefix: 'station:|slot:/Drivers/AHU1' },
-          },
-          {
-            type: 'message-stop',
-            stopReason: 'tool_use',
-            usage: { inputTokens: 130, outputTokens: 18 },
-          },
-        ],
-      },
-      // Turn 4: final summary + a real chart fence — readHistory not needed
-      // because the mock won't actually have time-series data; we synthesise
-      // a small series in the LLM-emitted chart payload for the e2e to assert.
-      {
-        events: [
-          {
-            type: 'message-start',
-            messageId: 'mock_rooftop_4',
+            messageId: 'mock_rooftop_summary',
             model: 'mock',
             usage: { inputTokens: 200, outputTokens: 0 },
           },
