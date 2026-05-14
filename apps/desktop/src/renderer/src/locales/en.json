@@ -60,7 +60,14 @@
     "toolArgs": "Arguments",
     "toolOutput": "Result",
     "toolQueued": "queued for operator approval",
-    "chartStub": "Chart inline rendering — wires up in C76.",
+    "chartAria": "Inline chart",
+    "chartShowPayload": "Show payload",
+    "chartDownsampled": "Downsampled {{name}}: {{from}} → {{to}} points.",
+    "chartFallback": {
+      "oversized": "Chart payload too large",
+      "schema-error": "Chart payload didn't match the expected shape",
+      "no-points": "Chart payload had no usable points"
+    },
     "starterQuestionsHeading": "Try asking",
     "diagnosticFlowsHeading": "Diagnostic flows",
     "flowRun": "Run",

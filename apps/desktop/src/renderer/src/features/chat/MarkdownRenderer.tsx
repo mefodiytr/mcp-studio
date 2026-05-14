@@ -4,21 +4,22 @@ import remarkGfm from 'remark-gfm';
 
 import { cn } from '@renderer/lib/utils';
 
-import { ChatChart } from './ChatChart';
+import { ChatChart, parseChartPayload } from './ChatChart';
 
 /**
  * Assistant-message markdown renderer.
  *
  * - `react-markdown` + `remark-gfm` (tables, strikethrough, task lists).
  * - The `components.code` handler intercepts ```chart ... ``` code fences
- *   (D8 — JSON code fence with `language-chart`): it parses the body as JSON
- *   and renders a `<ChatChart>` via the M4 `@mcp-studio/charts` primitives.
- *   Parse failure or zod validation failure → falls through to the default
- *   `<code>` rendering — the user sees the payload, not a broken chart.
- *
- * The full `language-chart` zod validation + `<TimeSeriesChart>` rendering
- * lands in C76. The C71 stub renders all chart fences as plain code blocks
- * but the interception point is in place so C76 is a one-spot wire-up.
+ *   (D8 — JSON code fence with `language-chart`):
+ *     - On a successful parse (or a schema/oversize failure), renders
+ *       `<ChatChart>` — successful renders the chart; schema/oversize show
+ *       a warning chip + the raw payload.
+ *     - On a JSON parse failure, falls through to the default `<pre><code>`
+ *       block. This preserves the LLM's ability to *document* the chart
+ *       syntax with a deliberately-invalid example in a `chart` code block
+ *       — the user sees the example as a normal code snippet, not a broken
+ *       chart warning.
  */
 export function MarkdownRenderer({ text }: { text: string }): ReactNode {
   // Memo so a re-render with the same text doesn't re-parse + re-render the
@@ -35,7 +36,12 @@ export function MarkdownRenderer({ text }: { text: string }): ReactNode {
               const language = match?.[1];
               const codeText = String(children).replace(/\n$/, '');
               if (language === 'chart') {
-                return <ChatChart payloadText={codeText} />;
+                const outcome = parseChartPayload(codeText);
+                // `json-error` falls through to the default code-block path
+                // (the LLM is documenting syntax, not emitting a chart).
+                if (outcome.kind === 'ok' || outcome.reason !== 'json-error') {
+                  return <ChatChart payloadText={codeText} />;
+                }
               }
               return (
                 <code className={cn(className, 'rounded bg-muted px-1 py-0.5')} {...rest}>
