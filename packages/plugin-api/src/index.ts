@@ -144,13 +144,16 @@ export interface PluginCommand {
   run: () => void | Promise<void>;
 }
 
-/** A canned multi-step diagnostic flow a plugin contributes to the M5 chat
- *  view. In M5 the `prompt` is a *templated user message* (free-text with
- *  `${placeholder}` slots the host's flow-launcher dialog fills in) that the
- *  ReAct loop walks naturally — D7 recon: plan-and-execute layering on stored
- *  plan templates is M6. The `params` array describes the placeholders the
- *  launcher dialog should prompt for; an empty / absent `params` means the
- *  prompt is sent verbatim. */
+/** A canned multi-step diagnostic flow a plugin contributes to the chat
+ *  view. **M5** ships flows as a templated `prompt` (free-text with
+ *  `${placeholder}` slots the launcher dialog fills in) that the ReAct loop
+ *  walks naturally. **M6** adds an optional `plan: PlanStep[]` — when present,
+ *  the chat runner switches to plan-and-execute (deterministic step
+ *  sequence with `runIf` conditional skips + `${var.path}` substitution
+ *  against bound results); when absent, the M5 `prompt` is used as the
+ *  user-message kick-off (back-compat preserved). M8's visual flow builder
+ *  edits the `plan` shape directly.
+ */
 export interface DiagnosticFlow {
   /** Stable key — used for palette command ids + (M6+) saved-flow refs. */
   id: string;
@@ -158,23 +161,235 @@ export interface DiagnosticFlow {
   title: string;
   /** One-line description; tooltip + dialog body. */
   description: string;
-  /** Templated user-message prompt. `${name}` tokens are substituted from the
-   *  launcher's collected `params`. The host base system prompt + plugin
-   *  systemPrompt have already been assembled — `prompt` is just the user
-   *  message that kicks off the ReAct loop. */
+  /** **M5 back-compat / fallback.** Templated user-message prompt. `${name}`
+   *  tokens are substituted from the launcher's collected `params`. Used when
+   *  `plan` is absent (M5 flows continue to work unchanged). */
   prompt: string;
   /** The placeholders the launcher dialog should prompt for. Empty / absent
-   *  means the prompt has no substitutions; the flow runs as-is. */
+   *  means the prompt / plan has no substitutions. */
   params?: DiagnosticFlowParam[];
+  /** **M6.** Structured plan steps. When present, the chat runner executes
+   *  the plan deterministically (rather than handing `prompt` to ReAct);
+   *  steps run in order, each step's `runIf` predicate is evaluated against
+   *  the bound variables from upstream steps + the collected `params`, and
+   *  `bindResultTo` binds a step's result into the variable map for downstream
+   *  use. M5-shaped flows (no `plan` field) continue to run via the M5 ReAct
+   *  path. */
+  plan?: PlanStep[];
 }
 
 export interface DiagnosticFlowParam {
-  /** Token name — matches `${name}` in the flow's `prompt`. */
+  /** Token name — matches `${name}` in the flow's `prompt` *and* in any
+   *  plan step's `args` / `prompt` `${param.<name>}` substitution path. */
   name: string;
   /** Field label in the launcher dialog. */
   label: string;
   /** Optional placeholder / hint. */
   placeholder?: string;
+}
+
+// ── M6 structured plan model ──────────────────────────────────────────────
+
+/**
+ * One step in a diagnostic-flow plan (M6 D1 — linear-with-`runIf`-skips).
+ * Two kinds in v1: `tool-call` (invokes an MCP tool with substituted args)
+ * and `llm-step` (calls the LLM with a templated prompt + the conversation
+ * history). The terminal step is normally an `llm-step` whose result becomes
+ * the final assistant message; intermediate steps `bindResultTo` a variable
+ * name so downstream steps can reference the value via `${var.path}`.
+ *
+ * **What's intentionally out of v1**: `aggregator` / `condition` / `output`
+ * step kinds, true fork/join branching, and arbitrary JS expressions in
+ * `runIf`. M8's visual builder edits this shape + extends with more kinds
+ * against the same envelope — the v1 contract is forward-compatible.
+ */
+export type PlanStep =
+  | {
+      kind: 'tool-call';
+      /** Stable id within the plan — used by the chat's per-step rendering
+       *  + `Message.planStepId` cross-ref. */
+      id: string;
+      /** MCP tool name — must be in the active connection's `tools/list`. */
+      tool: string;
+      /** Arguments. Each value is either a literal (JSON-able), or a
+       *  `${param.x}` / `${var.path}` template string substituted at run
+       *  time against the launcher params + the bound-variable map. */
+      args: Record<string, unknown>;
+      /** Variable name to bind the tool's result to (downstream steps can
+       *  reference it via `${var.<name>...}`). Absent means the result is
+       *  not threaded downstream. */
+      bindResultTo?: string;
+      /** Skip this step when the predicate evaluates to `false`. Absent =
+       *  `{kind:'always'}` (always runs). */
+      runIf?: ConditionExpr;
+      /** Optional inline description shown in the plan editor's step row —
+       *  short, ≤80 chars; the editor falls back to `${tool}(…)` if absent. */
+      label?: string;
+    }
+  | {
+      kind: 'llm-step';
+      id: string;
+      /** Templated prompt. `${param.x}` / `${var.path}` substituted at run
+       *  time. The LLM's text reply binds to `bindResultTo` if set; the
+       *  *terminal* `llm-step` of a plan (no `bindResultTo`) renders as the
+       *  final assistant message in the chat. */
+      prompt: string;
+      bindResultTo?: string;
+      runIf?: ConditionExpr;
+      /** Optional model override for cost / latency control on intermediate
+       *  classify-or-summarise steps (e.g. `'claude-haiku-4-5'` for a cheap
+       *  intermediate; the terminal step normally inherits the conversation's
+       *  default). */
+      model?: string;
+      label?: string;
+    };
+
+/**
+ * The v1 condition DSL (M6 D1 — six tags, no `and`/`or`/`any` combinators).
+ * Open-ended JS expressions / nested combinators are an m6-followup if real
+ * flows need them.
+ *
+ *   `always`      — runs unconditionally (effectively absent `runIf`)
+ *   `never`       — skips unconditionally (useful for plan-editor "disable
+ *                    this step" toggles without removing it from the plan)
+ *   `var-truthy`  — `path` resolves to a truthy value in the var map
+ *   `var-defined` — `path` resolves to a non-undefined, non-null value
+ *   `var-compare` — numeric / string / boolean comparison against `value`
+ *   `var-length-gt` — `path` resolves to an array; its length exceeds `value`
+ */
+export type ConditionExpr =
+  | { kind: 'always' }
+  | { kind: 'never' }
+  | { kind: 'var-truthy'; path: string }
+  | { kind: 'var-defined'; path: string }
+  | {
+      kind: 'var-compare';
+      path: string;
+      op: '>' | '<' | '>=' | '<=' | '==' | '!=';
+      value: number | string | boolean;
+    }
+  | { kind: 'var-length-gt'; path: string; value: number };
+
+/** Read a dotted path out of a variable map, with array-index support.
+ *  `getVarPath({a:{b:[{c:1}]}}, 'a.b.0.c')` → `1`. Returns `undefined` for
+ *  any segment that doesn't resolve. Exported for testability + the plan
+ *  editor's variable-reference autocomplete. */
+export function getVarPath(vars: Record<string, unknown>, path: string): unknown {
+  if (!path) return undefined;
+  let cursor: unknown = vars;
+  for (const segment of path.split('.')) {
+    if (cursor === null || cursor === undefined) return undefined;
+    if (Array.isArray(cursor)) {
+      const idx = Number.parseInt(segment, 10);
+      if (Number.isNaN(idx)) return undefined;
+      cursor = cursor[idx];
+    } else if (typeof cursor === 'object') {
+      cursor = (cursor as Record<string, unknown>)[segment];
+    } else {
+      return undefined;
+    }
+  }
+  return cursor;
+}
+
+/** Evaluate a {@link ConditionExpr} against a variable map. Pure; testable.
+ *  Used by the M6 plan runner at each step's `runIf` decision point + by
+ *  the plan editor's "this step will skip" preview. */
+export function evalCondition(expr: ConditionExpr | undefined, vars: Record<string, unknown>): boolean {
+  if (!expr) return true;
+  switch (expr.kind) {
+    case 'always':
+      return true;
+    case 'never':
+      return false;
+    case 'var-truthy':
+      return Boolean(getVarPath(vars, expr.path));
+    case 'var-defined': {
+      const v = getVarPath(vars, expr.path);
+      return v !== undefined && v !== null;
+    }
+    case 'var-compare': {
+      const v = getVarPath(vars, expr.path);
+      const left = v as number | string | boolean | null | undefined;
+      const right = expr.value;
+      switch (expr.op) {
+        case '==':
+          return left === right;
+        case '!=':
+          return left !== right;
+        case '>':
+          return typeof left === 'number' && left > Number(right);
+        case '<':
+          return typeof left === 'number' && left < Number(right);
+        case '>=':
+          return typeof left === 'number' && left >= Number(right);
+        case '<=':
+          return typeof left === 'number' && left <= Number(right);
+      }
+    }
+    // eslint-disable-next-line no-fallthrough
+    case 'var-length-gt': {
+      const v = getVarPath(vars, expr.path);
+      return Array.isArray(v) && v.length > expr.value;
+    }
+  }
+}
+
+/** Substitute `${param.x}` / `${var.path}` tokens in a template string against
+ *  the launcher params + the bound-variable map. Unknown tokens are left as
+ *  the literal `${...}` so the LLM sees them + can complain (matches the M5
+ *  `substituteFlowPrompt` behaviour).
+ *
+ *  The substitutor returns a string — non-string variable values are
+ *  JSON-stringified (so `${var.equipment}` rendering an object dumps the
+ *  JSON; the LLM consumes it from prose). For `tool-call.args` that need
+ *  the *typed* value (e.g. an array passed as the `points` arg), use
+ *  {@link substituteValue} instead, which preserves the bound type when
+ *  the entire template is a single `${var.path}` token. */
+export function substituteVars(template: string, vars: Record<string, unknown>): string {
+  return template.replace(/\$\{([\w.]+)\}/g, (match, path: string) => {
+    const segments = path.split('.');
+    const root = segments[0];
+    if (!root) return match;
+    const rest = segments.slice(1).join('.');
+    const lookup = vars[root];
+    if (lookup === undefined) return match;
+    const resolved = rest ? getVarPath({ [root]: lookup }, path) : lookup;
+    if (resolved === undefined) return match;
+    if (typeof resolved === 'string') return resolved;
+    try {
+      return JSON.stringify(resolved);
+    } catch {
+      return String(resolved);
+    }
+  });
+}
+
+/** Substitute a value that may itself be a `${var.path}` token *as a whole*
+ *  — when the entire input string is a single token, the bound typed value
+ *  is returned (preserving arrays / numbers / booleans); otherwise the
+ *  string-substituted form is returned (via {@link substituteVars}). Used
+ *  by `tool-call.args` so a step like
+ *  `{ ord: '${equipment.ord}', limit: '${param.limit}' }` keeps `ord` as a
+ *  string AND `limit` as a number after substitution. Non-string values
+ *  pass through unchanged. */
+export function substituteValue(value: unknown, vars: Record<string, unknown>): unknown {
+  if (typeof value !== 'string') return value;
+  // Whole-token form: ${...} with nothing else.
+  const whole = /^\$\{([\w.]+)\}$/.exec(value);
+  if (whole) {
+    const path = whole[1] ?? '';
+    const segments = path.split('.');
+    const root = segments[0];
+    if (!root) return value;
+    const lookup = vars[root];
+    if (lookup === undefined) return value;
+    const rest = segments.slice(1).join('.');
+    const resolved = rest ? getVarPath({ [root]: lookup }, path) : lookup;
+    return resolved === undefined ? value : resolved;
+  }
+  // Mixed form: interpolate as a string.
+  return substituteVars(value, vars);
 }
 
 /** A plugin = a manifest + the views it contributes, plus optional per-context
