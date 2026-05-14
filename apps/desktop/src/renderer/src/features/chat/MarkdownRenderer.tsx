@@ -1,10 +1,39 @@
 import { type ReactNode, useMemo } from 'react';
+import { Network } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+import { useHostBus } from '@mcp-studio/plugin-api';
 
 import { cn } from '@renderer/lib/utils';
 
 import { ChatChart, parseChartPayload } from './ChatChart';
+
+const ORD_LINK_PROTOCOL = 'mcp-studio-ord:';
+
+/** Rewrite `<ord>X</ord>` into `[X](mcp-studio-ord:<base64>)` markdown links —
+ *  the regular link pipeline handles them after this pass; the custom
+ *  `components.a` decodes the base64 + renders a clickable ord chip.
+ *
+ *  Base64 keeps ord characters that markdown's link syntax doesn't like
+ *  (parentheses, pipes, slashes, spaces) round-trippable through `[label](url)`. */
+function rewriteOrdRefs(text: string): string {
+  return text.replace(/<ord>(.*?)<\/ord>/g, (_, raw: string) => {
+    const ord = raw.trim();
+    if (!ord) return raw;
+    const encoded = btoa(unescape(encodeURIComponent(ord)));
+    return `[${ord}](${ORD_LINK_PROTOCOL}${encoded})`;
+  });
+}
+
+function decodeOrdHref(href: string | undefined): string | null {
+  if (!href || !href.startsWith(ORD_LINK_PROTOCOL)) return null;
+  try {
+    return decodeURIComponent(escape(atob(href.slice(ORD_LINK_PROTOCOL.length))));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Assistant-message markdown renderer.
@@ -20,8 +49,14 @@ import { ChatChart, parseChartPayload } from './ChatChart';
  *       syntax with a deliberately-invalid example in a `chart` code block
  *       — the user sees the example as a normal code snippet, not a broken
  *       chart warning.
+ * - `<ord>...</ord>` inline refs (C79) are pre-rewritten as markdown links
+ *   with the `mcp-studio-ord:` protocol; `components.a` decodes the base64
+ *   ord + renders a clickable chip that publishes to the plugin-api host bus.
+ *   The AppShell switches to the Niagara plugin's Explorer view + the
+ *   Explorer consumes the published ord and calls `select(ord)`.
  */
 export function MarkdownRenderer({ text }: { text: string }): ReactNode {
+  const publishOrd = useHostBus((s) => s.publishOrdNav);
   // Memo so a re-render with the same text doesn't re-parse + re-render the
   // tree. The parent (Message component) controls when this view updates.
   return useMemo(
@@ -57,12 +92,34 @@ export function MarkdownRenderer({ text }: { text: string }): ReactNode {
                 </pre>
               );
             },
+            a(props) {
+              const { href, children } = props;
+              const ord = decodeOrdHref(href);
+              if (ord !== null) {
+                return (
+                  <button
+                    type="button"
+                    className="not-prose mx-0.5 inline-flex items-center gap-1 rounded border bg-muted/50 px-1.5 py-0.5 align-baseline text-[12px] font-mono text-foreground hover:bg-muted"
+                    onClick={() => publishOrd(ord)}
+                    title={`Open ${ord} in the Niagara Explorer`}
+                  >
+                    <Network className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                    {ord}
+                  </button>
+                );
+              }
+              return (
+                <a href={href} target="_blank" rel="noreferrer noopener">
+                  {children}
+                </a>
+              );
+            },
           }}
         >
-          {text}
+          {rewriteOrdRefs(text)}
         </ReactMarkdown>
       </div>
     ),
-    [text],
+    [text, publishOrd],
   );
 }

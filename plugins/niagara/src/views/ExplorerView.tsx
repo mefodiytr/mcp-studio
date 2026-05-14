@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
-import type { PluginContext } from '@mcp-studio/plugin-api';
+import { useHostBus, type PluginContext } from '@mcp-studio/plugin-api';
 import { cn } from '@mcp-studio/ui';
 
 import { Breadcrumbs } from '../components/Breadcrumbs';
@@ -40,6 +40,23 @@ export function ExplorerView({ ctx }: { ctx: PluginContext }) {
     reveal(ord);
     ctx.setCwd(ord);
   };
+
+  // M5 C79 — consume any pending host-bus ord-navigation request. The chat
+  // view's `<ord>` chip click publishes; AppShell switches to this view; this
+  // effect fires on (re-)mount + on each future publish, reveals the ord in
+  // the tree, and clears the pending value. `peek` (the watched value) makes
+  // the effect re-run on each publish; `consume` clears so a second mount
+  // doesn't double-fire.
+  const pendingOrdNav = useHostBus((s) => s.pendingOrdNav);
+  const consumeOrdNav = useHostBus((s) => s.consumeOrdNav);
+  useEffect(() => {
+    if (!pendingOrdNav) return;
+    const taken = consumeOrdNav();
+    if (!taken) return;
+    reveal(taken.ord);
+    select(taken.ord);
+    ctx.setCwd(taken.ord);
+  }, [pendingOrdNav, consumeOrdNav, reveal, select, ctx]);
 
   return (
     <div className="flex h-full flex-col">

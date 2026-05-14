@@ -6,6 +6,8 @@ import { Button } from '@renderer/components/ui/button';
 import { useAppCommands } from '@renderer/lib/commands';
 import { useConnections } from '@renderer/lib/connections';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
+import { useHostBus } from '@mcp-studio/plugin-api';
+
 import { IN_BOX_PLUGINS, pickPlugin } from '@renderer/plugins/registry';
 import { useTemplatingStore } from '@renderer/stores/templating';
 import { useWorkspaceStore, type PluginViewRef, type Tab } from '@renderer/stores/workspace';
@@ -158,6 +160,20 @@ export function AppShell() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
+
+  // C79 — chat ord-chip click → switch to the Niagara plugin's Explorer view.
+  // The published ord stays in the host-bus's `pendingOrdNav` after this hook
+  // triggers the view switch; the niagara `ExplorerView` mounts and calls
+  // `consumeOrdNav()` on its own effect to call `useExplorerStore.select(ord)`.
+  // Two consumers don't race because this side only PEEKS (re-renders when
+  // pending changes) while the plugin-side CONSUMES (clears).
+  const pendingOrd = useHostBus((s) => s.pendingOrdNav);
+  useEffect(() => {
+    if (!pendingOrd || !activePlugin || !pluginConnection) return;
+    const explorerView = activePlugin.views.find((v) => v.id === 'explorer');
+    if (!explorerView) return;
+    focusOrOpen({ plugin: activePlugin.manifest.name, viewId: explorerView.id }, pluginConnection.connectionId);
+  }, [pendingOrd, activePlugin, pluginConnection, focusOrOpen]);
 
   return (
     <div className="flex h-full w-full bg-background text-foreground">

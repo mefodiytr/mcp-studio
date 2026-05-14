@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react';
 import { z } from 'zod';
 
+export { useHostBus } from './host-bus';
+
 /**
  * The plugin contract — what an in-box plugin (e.g. Niagara) exposes to the
  * host, and what the host hands back. Build-time, statically imported by the

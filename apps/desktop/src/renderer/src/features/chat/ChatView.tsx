@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Send, StopCircle } from 'lucide-react';
+import { Bot, RotateCcw, Send, StopCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { runReAct, type LlmMessage, type LlmTool, type RunnerEvent } from '@mcp-studio/llm-provider';
@@ -137,6 +137,7 @@ export function ChatView() {
   >([]);
   const [running, setRunning] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [userInput, setUserInput] = useState('');
 
   // Hydrate
@@ -380,6 +381,37 @@ export function ChatView() {
     [handleSend],
   );
 
+  // C79 — Regenerate: truncate the conversation back to before the last user
+  // message that had a text body, then re-send that text. The runner persists
+  // the user message + the new assistant turn fresh; the regenerated chain
+  // replaces the old one in the conversation log.
+  const handleRegenerate = useCallback(async () => {
+    if (!activeConversation || !profileId || running) return;
+    const messages = activeConversation.messages;
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m && m.role === 'user' && m.content.some((b) => b.type === 'text')) {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx < 0) return;
+    const lastUserMsg = messages[lastUserIdx];
+    if (!lastUserMsg) return;
+    const lastUserText = lastUserMsg.content
+      .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+    if (!lastUserText.trim()) return;
+    await upsert(profileId, {
+      ...activeConversation,
+      messages: messages.slice(0, lastUserIdx),
+      updatedAt: Date.now(),
+    });
+    await handleSend(lastUserText);
+  }, [activeConversation, profileId, running, upsert, handleSend]);
+
   const handleLaunchFlow = useCallback((flow: TaggedDiagnosticFlow) => {
     if (!flow.params || flow.params.length === 0) {
       void handleRunFlow(flow, {});
@@ -389,6 +421,44 @@ export function ChatView() {
     for (const p of flow.params) initial[p.name] = '';
     setFlowLauncher({ flow, paramValues: initial });
   }, [handleRunFlow]);
+
+  // C79 — keyboard shortcuts. Mounted at the chat-view component level so
+  // they're only active while the chat rail is open (unmount on view-switch
+  // removes them). Standard chat-app patterns:
+  //   Ctrl+Enter   send (from any focus inside the chat)
+  //   Esc          stop generation
+  //   Ctrl+Shift+N start a new conversation
+  //   Ctrl+/       focus the chat input from anywhere
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === 'Enter') {
+        e.preventDefault();
+        void handleSend(undefined);
+        return;
+      }
+      if (e.key === 'Escape' && running) {
+        e.preventDefault();
+        abortRef.current?.abort();
+        return;
+      }
+      if (ctrl && e.shiftKey && (e.key === 'N' || e.key === 'n')) {
+        e.preventDefault();
+        setActiveId(null);
+        setUserInput('');
+        // Focus input next tick — after the empty-state re-render mounts it.
+        setTimeout(() => inputRef.current?.focus(), 0);
+        return;
+      }
+      if (ctrl && e.key === '/') {
+        e.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleSend, running]);
 
   // Consume palette-enqueued flow launches (the cross-cut between
   // useAppCommands' "Run diagnostic flow: …" command + the chat view's
@@ -434,7 +504,22 @@ export function ChatView() {
               )}
             </p>
           </div>
-          {activeConversation && <UsageBadge conversation={activeConversation} />}
+          <div className="flex items-center gap-2">
+            {activeConversation && activeConversation.messages.some((m) => m.role === 'assistant') && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void handleRegenerate()}
+                disabled={running}
+                title={t('chat.regenerate')}
+                aria-label={t('chat.regenerate')}
+              >
+                <RotateCcw className="size-3.5" />
+                <span className="ml-1 text-xs">{t('chat.regenerate')}</span>
+              </Button>
+            )}
+            {activeConversation && <UsageBadge conversation={activeConversation} />}
+          </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {!activeConversation || activeConversation.messages.length === 0 ? (
@@ -490,6 +575,7 @@ export function ChatView() {
             className="flex items-center gap-2"
           >
             <Input
+              ref={inputRef}
               type="text"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}

@@ -72,6 +72,7 @@
     "diagnosticFlowsHeading": "Diagnostic flows",
     "flowRun": "Run",
     "flowCancel": "Cancel",
+    "regenerate": "Regenerate",
     "usage": {
       "aria": "Conversation usage: {{tokens}} tokens, approximately {{cost}}",
       "tokensSuffix": "tokens",
