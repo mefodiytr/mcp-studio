@@ -13,7 +13,7 @@
 
 The same workflow as M1/M1.5/M2/M3/M4: written plan first → atomic commits, each passing `pnpm lint` + `pnpm -r --if-present typecheck` + `pnpm -r --if-present test` + `pnpm --filter @mcp-studio/desktop build` + `pnpm test:e2e`, all green; constructive deviation = labelled + rationale, never silent; the §13 coverage ratchet (run coverage before committing if a commit touches a covered package; add a test in the same commit if near the floor; no fix-forward); no progress check-ins within a phase except (a) ad-hoc on an architectural contradiction, (b) phase boundaries. The C-numbering is a guideline — splits / re-orderings are pragmatic atomicity, not deviations.
 
-Source-of-truth vision: [`handover.md`](../handover.md) Part 2 — written at M2/M3 boundary; M5 reconciles the §8 open questions against the **actual** M3+M4 reality (the chart primitives shipped, the `PluginContext.callTool({write:true})` seam already exists, the per-profile persistence shape is established by the M4 watch store, `useExplorerStore.known` is now a three-consumer shared cache).
+Source-of-truth vision: [`handover.md`](handover.md) Part 2 — written at M2/M3 boundary; M5 reconciles the §8 open questions against the **actual** M3+M4 reality (the chart primitives shipped, the `PluginContext.callTool({write:true})` seam already exists, the per-profile persistence shape is established by the M4 watch store, `useExplorerStore.known` is now a three-consumer shared cache).
 
 ---
 
