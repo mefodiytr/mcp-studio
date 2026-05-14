@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-studio/llm-provider",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Provider-agnostic LLM streaming + ReAct loop. Renderer-only consumption: the chat view initiates the stream, tool-use blocks dispatch through window.studio.callTool to main. Main never imports this package directly — it sees AI-attributed tool calls via the M5 caller arg on the tools:call IPC and routes them through the M3 pending-changes safety boundary.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures/*": "./test/fixtures/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "capture-fixture": "node scripts/capture-fixture.mjs",
+    "repl": "node bin/repl.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  }
+}
