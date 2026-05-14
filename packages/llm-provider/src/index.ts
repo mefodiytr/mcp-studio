@@ -25,6 +25,9 @@ export type { AnthropicSseEvent } from './anthropic-stream';
 export { runReAct } from './runner';
 export type { RunReActOptions, RunnerEvent } from './runner';
 
+export { runPlan } from './plan-runner';
+export type { PlanRunnerEvent, RunPlanOptions } from './plan-runner';
+
 export { FakeLlmProvider, textTurn, toolUseTurn } from './fake';
 export type { FakeProviderTurn } from './fake';
 

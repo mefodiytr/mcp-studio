@@ -151,6 +151,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.39.0
         version: 0.39.0(encoding@0.1.13)
+      '@mcp-studio/plugin-api':
+        specifier: workspace:*
+        version: link:../plugin-api
       zod:
         specifier: ^3.24.1
         version: 3.25.76
