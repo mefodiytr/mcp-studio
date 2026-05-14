@@ -242,6 +242,46 @@ export const invokeChannels = {
     request: z.object({ provider: z.string() }),
     response: z.object({}),
   },
+
+  // ── Plugin systemPrompt cache (M6 C85b — per-(plugin, profile,
+  //    connection) TTL cache for resolved systemPrompt strings). The
+  //    renderer's chat-runner-launch path checks the cache before invoking
+  //    the plugin's async systemPrompt(ctx); on hit, uses the cached value
+  //    + schedules a background refresh; on miss, fires the live call +
+  //    populates the cache. ────────────────────────────────────────────
+  'llm:systemPromptCache:get': {
+    request: z.object({
+      pluginName: z.string(),
+      profileId: z.string(),
+      connectionId: z.string(),
+    }),
+    response: z.object({
+      value: z.string().nullable(),
+      /** Absolute ms-epoch timestamp; null on a miss. */
+      expiresAt: z.number().nullable(),
+    }),
+  },
+  'llm:systemPromptCache:set': {
+    request: z.object({
+      pluginName: z.string(),
+      profileId: z.string(),
+      connectionId: z.string(),
+      value: z.string(),
+      /** TTL override in ms. Absent → SYSTEM_PROMPT_CACHE_DEFAULT_TTL_MS. */
+      ttlMs: z.number().int().positive().optional(),
+    }),
+    response: z.object({ expiresAt: z.number() }),
+  },
+  'llm:systemPromptCache:clear': {
+    /** Clear matching entries. Absent fields = wildcard; an empty request
+     *  clears EVERY entry (the "reset all caches" dev affordance). */
+    request: z.object({
+      pluginName: z.string().optional(),
+      profileId: z.string().optional(),
+      connectionId: z.string().optional(),
+    }),
+    response: z.object({ removed: z.number() }),
+  },
 } as const;
 
 export const eventChannels = {

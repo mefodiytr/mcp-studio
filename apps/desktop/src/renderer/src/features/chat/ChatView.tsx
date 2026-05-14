@@ -136,17 +136,61 @@ export function ChatView() {
   // Helper to build the full async system prompt at runner-launch time.
   // Memoised on `active` so handleSend / handleRunPlan get the same
   // function identity per active connection.
+  //
+  // **M6 C85b** — cache-aware. Before invoking the plugin's
+  // `systemPrompt(ctx)`, look up the main-side cache via
+  // `llm:systemPromptCache:get` keyed by (pluginName, profileId,
+  // connectionId). On hit: return the cached value immediately + fire a
+  // fire-and-forget background refresh that re-fetches the inventory + sets
+  // the cache. On miss: do the blocking assemble (up to 10s timeout) + set
+  // the cache on success.
+  //
+  // The cache stays in main so it survives renderer reloads and shares
+  // across multi-window sessions on the same profile (M6 D4 design).
   const buildSystemPrompt = useCallback(async (): Promise<string> => {
     if (!active) return HOST_BASE_SYSTEM_PROMPT;
     const plugin = pickPlugin(active.serverInfo);
     if (!plugin) return HOST_BASE_SYSTEM_PROMPT;
     const ctx = buildPluginContext(active);
+    const pluginName = plugin.manifest.name;
+    const profileId = active.profileId;
+    const connectionId = active.connectionId;
+
+    // Cache lookup.
+    const cached = await bridge().invoke('llm:systemPromptCache:get', {
+      pluginName,
+      profileId,
+      connectionId,
+    });
+
+    if (cached.value !== null) {
+      // Warm-cache hit. Clear any prior warning chip (the cached value
+      // implies a successful past assemble — the operator no longer needs
+      // to see the "unavailable" warning); fire a fire-and-forget refresh
+      // so the next conversation gets the latest inventory.
+      setSystemPromptWarnings([]);
+      void backgroundRefreshSystemPrompt({ plugin, ctx, pluginName, profileId, connectionId });
+      return cached.value;
+    }
+
+    // Cold cache: do the blocking assemble.
     setSystemPromptWarnings([]);
     const out = await assemblePluginContributions([plugin], ctx, {
-      onSystemPromptTimeout: (pluginName) => {
-        setSystemPromptWarnings((prev) => (prev.includes(pluginName) ? prev : [...prev, pluginName]));
+      onSystemPromptTimeout: (timedOutPlugin) => {
+        setSystemPromptWarnings((prev) => (prev.includes(timedOutPlugin) ? prev : [...prev, timedOutPlugin]));
       },
     });
+    // Only cache when the plugin section actually landed in the prompt
+    // (the prompt is longer than the host base alone) — caching the bare
+    // host-base on a timeout would mask the issue from the next launch.
+    if (out.systemPrompt.length > HOST_BASE_SYSTEM_PROMPT.length) {
+      void bridge().invoke('llm:systemPromptCache:set', {
+        pluginName,
+        profileId,
+        connectionId,
+        value: out.systemPrompt,
+      });
+    }
     return out.systemPrompt;
   }, [active]);
 
@@ -1139,6 +1183,42 @@ function EmptyState({
       )}
     </div>
   );
+}
+
+/**
+ * **M6 C85b** — fire-and-forget background refresh of a cached
+ * systemPrompt. Called on a warm-cache hit; refreshes the inventory in the
+ * background so the *next* conversation on the same profile picks up
+ * knowledge-model edits within the TTL window without waiting on the
+ * blocking assemble path. Errors are swallowed silently (the cached value
+ * is still serving the active conversation; the next conversation either
+ * gets fresh data or re-runs the cold path).
+ */
+async function backgroundRefreshSystemPrompt(opts: {
+  plugin: import('@mcp-studio/plugin-api').Plugin;
+  ctx: import('@mcp-studio/plugin-api').PluginContext;
+  pluginName: string;
+  profileId: string;
+  connectionId: string;
+}): Promise<void> {
+  try {
+    const out = await assemblePluginContributions([opts.plugin], opts.ctx);
+    if (out.systemPrompt.length <= HOST_BASE_SYSTEM_PROMPT.length) {
+      // Refresh produced an empty / base-only prompt — the inventory call
+      // failed in the background. Leave the cached value alone (it's still
+      // a successful past resolution that's better than nothing).
+      return;
+    }
+    await bridge().invoke('llm:systemPromptCache:set', {
+      pluginName: opts.pluginName,
+      profileId: opts.profileId,
+      connectionId: opts.connectionId,
+      value: out.systemPrompt,
+    });
+  } catch {
+    // Silent — the active conversation already has the cached prompt;
+    // we don't want to surface refresh failures to the operator.
+  }
 }
 
 /** Re-shape the persisted Message[] into the LlmMessage[] the runner expects. */
