@@ -325,7 +325,116 @@ M5 is **chat foundation + Niagara plugin contributions + write-tool safety inter
 
 ## Adjustments during the M5 build
 
-*(Filled in as commits land, per the M1–M4 pattern. The shipped state lives here; commit messages flag deviations; `m5-followups.md` carries the deferred list.)*
+What actually changed vs. the plan above (so the doc reflects the shipped state
+without spelunking commit messages). Full deferred-items list: [`docs/m5-followups.md`](m5-followups.md).
+
+**Phase A (C70–C72) — provider + chat foundation.** Landed as planned.
+- C70 — `@mcp-studio/llm-provider` shipped with `LlmProvider` / `LlmEvent` /
+  `AnthropicStreamMapper` / `runReAct` / `FakeLlmProvider` / `MockLlmProvider`.
+  26 unit tests against four JSONL stream fixtures (one canonical interleaved
+  text+tool_use from Anthropic's public docs verbatim; one text-only verbatim;
+  two synthesised edge cases — tool-only + multi-tool). Real-capture is a
+  file swap via `scripts/capture-fixture.mjs` when an `ANTHROPIC_API_KEY` is
+  in env.
+- C71 — chat foundation. The host-base system prompt + the four canned
+  mock programs landed here so the chat is exerciseable without an API
+  key from day one.
+- **C71 D4 deviation — API key reaches the renderer via `llm:getKey` IPC.**
+  Originally aspirational ("key never leaves main"); shipped as renderer-
+  side per the M5 D1 ESM-only Anthropic SDK + Electron-33 CJS main
+  decision. Compensating control: the key is fetched on-demand into the
+  chat-runner closure for the lifetime of one ReAct iteration; no long-
+  lived renderer state holding the key. Tracked in `m5-followups.md`;
+  the IPC stays as the canonical setter / hint accessor when M6+ moves
+  the provider into main.
+- C72 — Markdown chunk landed bigger than projected (372 kB vs the
+  ~80 kB estimate; remark-gfm pulls a fair micromark stack). Caches
+  after the first chat open. Three optimisation paths documented in
+  m5-followups; not preemptive.
+
+**Phase B (C73–C74) — plugin contributions.** Landed as planned.
+- C73 — the four-hook contract (`systemPrompt` / `starterQuestions` /
+  `diagnosticFlows` / `canHandleWrite`) + the `DiagnosticFlow` shape.
+  `assemblePluginContributions(plugins, ctx)` single resolution point.
+  Defensive against throwing plugins.
+- C74 — the Niagara plugin's three contributions covered every checklist
+  item from promt13 (ORD format / knowledge layer / kitFuzzy / BQL wart /
+  Russian-locale booleans / write-safety / annotation-override
+  transparency). Two flows shipped: rooftop-diagnosis (the §A walk) +
+  knowledge-summary.
+
+**Phase C (C75–C77) — the M5 deliverable.**
+- **C75 — three coupled landings in one commit** (per promt11): manifest-
+  schema migration of `toolAnnotationOverrides` → main-side annotation
+  registry → caller-attributed `ConnectionManager.callTool` interception.
+  `@mcp-studio/niagara` gained a `./manifest` subpath export so main can
+  import pure-data manifests without dragging in React; both
+  `@mcp-studio/niagara` and `@mcp-studio/plugin-api` joined the
+  `externalizeDepsPlugin` exclude list (same treatment as
+  `@mcp-studio/mcp-client` — bundled into main's CJS image). The
+  ToolCallOutcome shape gained `pendingEnqueued`; ToolHistoryEntry
+  gained `actor` + a new `status: 'queued'`. **The M3
+  niagara-write e2e passed unmodified — the C75 regression check held.**
+- **Post-C75 docs-only commit — `docs: post-M5 roadmap`** — slotted at
+  the C75/C76 boundary per promt14's "natural Phase C boundary"
+  guidance. Doesn't interrupt mid-commit work. `docs/roadmap.md` carries
+  the M6 → M7 → M8 → later shape.
+- C76 — chart code-fence interception. `parseChartPayload` extracted
+  into a pure `.ts` module (`chart-payload.ts`) so vitest can test it
+  without dragging the renderer-side `@renderer/...` alias resolution.
+  Defensive against ISO + epoch-ms timestamps; sorts out-of-order points
+  + downsamples to ≤500. **JSON-parse failure falls through to a plain
+  code block** — preserves the LLM's ability to *document* the chart
+  syntax with a deliberately-invalid example. Schema / oversize failures
+  surface as a warning chip with the payload underneath.
+- C77 — the three chat e2e specs (rooftop / write / cancel). Three
+  strict-mode locator collisions surfaced during the writing pass +
+  fixed: "MOCK PROVIDER" in two spots (chip + hint); tool names in two
+  spots (streaming Card + persisted Envelope); "queued for operator
+  approval" inside the envelope's collapsed tool_result (the canonical
+  signal is the LLM's follow-up assistant text). The `MockProgram` shape
+  widened to `MockEvent[] = LlmEvent | MockDelay` so the cancel program
+  can pace its text-deltas with `__delay` sentinels (filtered out before
+  yielding, honours `signal.aborted` for clean abort propagation).
+
+**Phase D (C78–C80) — token usage + polish + docs + tag.**
+- C78 — token usage ledger. Versioned pricing table
+  (`ANTHROPIC_PRICES_AS_OF` = `'2026-05-14'`) per promt15. UI marks the
+  cost estimate "approximate, prices as of …" in the tooltip; warning
+  chip at 80 % of the 50k soft cap; over-cap is destructive-styled but
+  still soft (sending isn't blocked). Captured the `message-stop`
+  event's cumulative usage onto the persisted `Message.usage` field via
+  the runner-event loop in ChatView. +19 unit tests.
+- C79 — chat polish per promt15:
+  - **`<ord>X</ord>` markdown extension.** Pre-rewrites the tags as
+    markdown links with the `mcp-studio-ord:<base64>` custom protocol;
+    `components.a` decodes + renders a clickable chip; click publishes
+    to the new host bus. AppShell switches to the niagara plugin's
+    Explorer view; the niagara ExplorerView consumes the ord and calls
+    `reveal()` + `select()` + `ctx.setCwd()`. The shared pub/sub
+    primitive (`useHostBus`) landed in `@mcp-studio/plugin-api` — lives
+    there so plugins subscribe via a stable workspace import (pnpm-
+    hoist gives both sides the same Zustand instance). plugin-api
+    gains `zustand` as a dep — small price for a stable cross-plugin
+    seam. Future M6+ channels (flow-builder / RAG refs / cross-plugin
+    intents) ride the same store shape.
+  - **Keyboard shortcuts.** Ctrl+Enter send / Esc stop / Ctrl+Shift+N
+    new conv / Ctrl+/ focus input. Mounted at chat-view scope so they
+    detach on view switch. Required `<Input>` (`@mcp-studio/ui`) to
+    forward refs — added.
+  - **Regenerate.** Truncate the conversation back to before the last
+    user message, re-send. Button in the chat header next to the
+    UsageBadge, only when there's ≥1 assistant turn.
+- C80 — this section + the master-spec M5 section + `m5-followups.md` +
+  the tag `v0.5.0-m5`. CONTRIBUTING.md gains the e2e assertion
+  discipline rule per the C77 strict-mode lessons + the m5-followups
+  entry tracking the `react-hooks/exhaustive-deps` sweep as a separate
+  future chore.
+
+**Numbering — Phase D ran three commits (C78 + C79 + C80) as planned;
+the polish items (C79) stayed a separate commit per promt15's "C79 chat
+polish — separate commit, NOT folded into C77" guidance so the Phase C
+deliverable boundary in the git log stays clean.**
 
 ## Ad-hoc check-in triggers (otherwise: note-and-continue)
 

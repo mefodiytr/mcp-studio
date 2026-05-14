@@ -2,7 +2,7 @@
 
 A universal MCP (Model Context Protocol) desktop client with a plugin host — and a Niagara/BMS station browser as the first specialized plugin. *What Workbench is to Niagara, MCP Studio aims to be to MCP servers.*
 
-**Version `v0.4.0-m4`** · M1 ✅ · M1.5 ✅ · M2 ✅ · M3 ✅ · M4 ✅ · M5 ⏳ · Proprietary — all rights reserved · Windows / macOS / Linux (unsigned builds only)
+**Version `v0.5.0-m5`** · M1 ✅ · M1.5 ✅ · M2 ✅ · M3 ✅ · M4 ✅ · M5 ✅ · M6 ⏳ · Proprietary — all rights reserved · Windows / macOS / Linux (unsigned builds only)
 
 ---
 
@@ -36,7 +36,11 @@ A universal MCP (Model Context Protocol) desktop client with a plugin host — a
 
 ![Niagara history view](docs/screenshots/m4-history.png)
 
-More in [`docs/screenshots/`](docs/screenshots/) (Property sheet, BQL result, the fresh-connection card with the "Specialized by Niagara station" badge, the M4 live monitor with sparklines + threshold visuals, the Tool-usage / Performance dashboards, and the M1 app-shell history). The M2 + M3 + M4 shots are captured by the Playwright e2e specs themselves — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the `MCPSTUDIO_E2E_SCREENSHOTS=1` capture pass.
+**AI co-pilot** (M5) — chat-based assistant per connection running a rooftop-diagnostic flow: three collapsible tool-call envelopes (`findEquipment` → `inspectComponent` → `getActiveAlarms`) and a final assistant message with an inline chart rendered from a `chart` code fence:
+
+![Rooftop diagnostic flow with chart-inline rendering](docs/screenshots/m5-rooftop-diagnosis.png)
+
+More in [`docs/screenshots/`](docs/screenshots/) (Property sheet, BQL result, the fresh-connection card with the "Specialized by Niagara station" badge, the M4 live monitor with sparklines + threshold visuals, the Tool-usage / Performance dashboards, the M5 chat empty state with starter chips + diagnostic flow buttons, an AI-proposed write badged in the Changes view, and the M1 app-shell history). The M2 + M3 + M4 + M5 shots are captured by the Playwright e2e specs themselves — see [`docs/screenshots/README.md`](docs/screenshots/README.md) for the `MCPSTUDIO_E2E_SCREENSHOTS=1` capture pass.
 
 ## Quick start
 
@@ -119,10 +123,10 @@ Currently **247 unit tests** (plugin-api / charts / schema-form / mcp-client / n
 - **M2** (`v0.2.0-m2`) — plugin architecture (`plugin-api`, `packages/ui`, the registry, the extensible command registry, the `{{cwd}}` token) + the read-only Niagara explorer (tree, folder, property sheet, quick-nav, BQL playground, type-aware icons, tool-schema hints).
 - **M3** (`v0.3.0-m3`) — write & safety: `Plugin.toolAnnotationOverrides` + the renderer's single-resolution-point overlay (the niagara map corrects niagaramcp's wrongly-annotated `walkthrough-write` family); an audit trail (write-flagged `tool-history` + "Writes only" filter + JSON export); the Niagara write engine — per-connection diff-and-approve queue (`changes` view, reversibility-flagged ops, irreversible-call-out on Apply, optimistic property-sheet pending state, dry-run preview on remove) + the tree's right-click create/remove/extend/link menu + the feature-detected user-context Bearer bootstrap (`setupTestUser` today, `provisionMcpUser`/`rotateMcpToken` later with no code change).
 - **M4** (`v0.4.0-m4`) — observability: a shared `@mcp-studio/charts` package (recharts wrappers + LTTB-ish downsampler — reusable by the M5 AI co-pilot's chat-inline charts); a host **Tool usage** view (most-called / per-tool latency / error breakdown — pure derivation over `tool-history`) and **Performance** view (latency histogram + slowest-N + p95 regression callout); the Niagara plugin gains a **History** view (`readHistory` + range picker + aggregation + multi-history overlay) and a **Live monitor** (drag-from-Explorer to add, per-row poll intervals + sparklines + threshold visuals, persisted per-profile).
-- **M5** (next) — AI co-pilot (`handover.md` Part 2 §A — "what's wrong with rooftop unit 5?" multi-step agent walk: `findEquipment` + `inspectComponent` + `getActiveAlarms` + `readHistory` → trend chart inline in chat, citations).
-- **M6+** (sketched) — macros & automation, compare & sync, plugin marketplace for non-Niagara servers, polish & code signing.
+- **M5** (`v0.5.0-m5`) — AI co-pilot: a chat-based assistant per connection. New `@mcp-studio/llm-provider` package (Anthropic Messages adapter + a bounded ReAct loop + `MockLlmProvider` for e2e); per-connection multi-conversation persistence (`WORKSPACE_VERSION` 3 → 4); plugin contributions (`Plugin.systemPrompt` / `starterQuestions` / `diagnosticFlows` — Niagara contributes ORD format / knowledge layer / kitFuzzy / BQL syntax wart / Russian-locale booleans + a rooftop-diagnosis flow); **AI-write safety boundary at `ConnectionManager.callTool` with caller attribution** — AI-attributed writes route through the M3 pending-changes queue with an "AI" chip in the Changes view (the M3 niagara-write e2e passes unmodified); chart-inline rendering (JSON code fence → `<TimeSeriesChart>` from the M4 charts package); per-conversation token usage ledger with a soft cap; `<ord>X</ord>` clickable refs that open the Niagara Explorer at that node.
+- **M6+** (sketched in [`docs/roadmap.md`](docs/roadmap.md)) — M6 diagnostic flows + RAG tier 1 (plan-and-execute on top of ReAct; conversation summary at head-trim; knowledge-layer enrichment in system prompt); M7 RAG tier 2 + multi-provider (`packages/rag` with a local vector store; OpenAI / Ollama adapters); M8 visual flow builder ("agent blocks", wire-sheet-inspired); later — multi-agent orchestration (stretch).
 
-Full plans: [`docs/milestone-1.md`](docs/milestone-1.md) · [`docs/milestone-1.5.md`](docs/milestone-1.5.md) · [`docs/milestone-2.md`](docs/milestone-2.md) (each with an "Adjustments during the build" section). Index: [`docs/README.md`](docs/README.md).
+Full plans: [`docs/milestone-1.md`](docs/milestone-1.md) · [`docs/milestone-1.5.md`](docs/milestone-1.5.md) · [`docs/milestone-2.md`](docs/milestone-2.md) · [`docs/milestone-3.md`](docs/milestone-3.md) · [`docs/milestone-4.md`](docs/milestone-4.md) · [`docs/milestone-5.md`](docs/milestone-5.md) (each with an "Adjustments during the build" section). Index: [`docs/README.md`](docs/README.md). Vision: [`docs/handover.md`](docs/handover.md) + [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Tech stack
 

@@ -68,6 +68,33 @@ Every milestone follows the same ritual, and it's worth keeping:
 
 See `docs/milestone-1.md` / `milestone-2.md` for worked examples (plan + the "Adjustments during the build" sections).
 
+## Canonical pitfalls (lessons surfaced during the build)
+
+- **Zustand selectors returning a derived collection MUST stabilise the
+  empty case** (M3 C55 / M4 C65). A selector like `(s) => s.queues.get(id)
+  ?? []` returns a fresh `[]` per render in the no-entry case; Zustand's
+  default `Object.is` equality sees a change every render → React #185
+  infinite loop. Fix: a module-level `const EMPTY: readonly T[] = []`
+  singleton returned by the no-entry branch.
+- **React Query `useEffect` deps on the query result reference don't fire
+  on flat-signal polls** (M4 C68a). `useEffect(..., [q.data])` won't
+  re-run when the polled value is identical (RQ memoises the reference).
+  Key on `[q.dataUpdatedAt, value]` instead — `dataUpdatedAt` bumps every
+  fetch regardless of value identity.
+- **e2e assertions: assert on operator-visible outcomes, not transient
+  envelope text** (M5 C77). The strict-mode locator collisions during
+  C77 traced back to relying on text that exists in two places (a
+  transient "Calling X…" streaming card + the persisted ToolCallEnvelope)
+  or in a collapsed-by-default block (tool_result inside an envelope).
+  Discipline: assert on the **persisted, operator-visible** outcome —
+  the queue's state in the Changes view, the audit entry in the History
+  panel, the badge in the UI — never on intermediate UI text that may be
+  collapsed, re-rendered, or surface in multiple spots.
+- **`useQuery` inside `.map()` violates rules-of-hooks for
+  dynamic-length series** (M4 C64). Use `useQueries` from React Query
+  for the dynamic-length case; ordinary `useQuery` only inside fixed-
+  shape components.
+
 ## Coverage ratchet
 
 Every package with a coverage config carries floor thresholds that **only go up**.
