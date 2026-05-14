@@ -73,6 +73,14 @@
     "flowRun": "Run",
     "flowCancel": "Cancel",
     "regenerate": "Regenerate",
+    "plan": {
+      "stepCount": "{{count}} steps",
+      "summary": "{{done}}/{{total}} done · {{skipped}} skipped · {{errored}} failed",
+      "params": "Params",
+      "steps": "Steps",
+      "run": "Run plan",
+      "cancel": "Cancel"
+    },
     "usage": {
       "aria": "Conversation usage: {{tokens}} tokens, approximately {{cost}}",
       "tokensSuffix": "tokens",

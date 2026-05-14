@@ -52,8 +52,17 @@ export const messageSchema = z.object({
   usage: usageSchema.optional(),
   /** Synthetic markers ("[stopped by user at turn N]", "[max-turns reached]")
    *  the chat view surfaces inline. Distinct from `role` so the styling
-   *  branch doesn't have to inspect the content. */
-  marker: z.enum(['aborted', 'max-turns-reached', 'error']).optional(),
+   *  branch doesn't have to inspect the content. M6 C86 adds `'summary'`
+   *  for the LLM-summarised head-trim placeholder. */
+  marker: z.enum(['aborted', 'max-turns-reached', 'error', 'summary']).optional(),
+  /** **M6.** Optional plan-execution provenance — when this message is part
+   *  of a structured plan's execution, `planFlowId` references the flow's
+   *  stable id and `planStepId` the step's id. Lets the chat view label the
+   *  message "this came from step N of plan X" + the plan editor jump-to-step
+   *  feature group all the per-step messages. Absent on non-plan messages
+   *  (every M5 message + every ReAct message). */
+  planFlowId: z.string().optional(),
+  planStepId: z.string().optional(),
   ts: z.number().int().nonnegative(),
 });
 export type Message = z.infer<typeof messageSchema>;

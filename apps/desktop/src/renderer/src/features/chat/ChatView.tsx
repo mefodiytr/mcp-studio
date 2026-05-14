@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, RotateCcw, Send, StopCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { runReAct, type LlmMessage, type LlmTool, type RunnerEvent } from '@mcp-studio/llm-provider';
+import {
+  runPlan,
+  runReAct,
+  type LlmMessage,
+  type LlmTool,
+  type PlanRunnerEvent,
+  type RunnerEvent,
+} from '@mcp-studio/llm-provider';
 import { enqueueAiWrite } from '@mcp-studio/niagara';
 
 import type { Conversation, ContentBlock, Message } from '../../../../shared/domain/conversations';
@@ -37,6 +44,7 @@ import { useDiagnosticFlowLauncher } from '@renderer/stores/diagnostic-flow-laun
 
 import { ConversationList } from './ConversationList';
 import { MessageView, type InlineToolResult } from './MessageView';
+import { PlanEditor, type PlanStepExecutionState } from './PlanEditor';
 import { UsageBadge } from './UsageBadge';
 
 function bridge(): NonNullable<typeof window.studio> {
@@ -129,6 +137,18 @@ export function ChatView() {
     flow: TaggedDiagnosticFlow;
     paramValues: Record<string, string>;
   } | null>(null);
+
+  // M6 — pending plan-and-execute preview. Set when a flow with a `plan`
+  // field is launched; renders the inline PlanEditor below the launching
+  // user message until the operator clicks Run (or Cancel) on the editor.
+  // `executionState === null` = preview state (Run button visible);
+  // present → running / done state (per-step status visible).
+  const [pendingPlan, setPendingPlan] = useState<{
+    flow: TaggedDiagnosticFlow;
+    params: Record<string, unknown>;
+    executionState: Record<string, PlanStepExecutionState> | null;
+  } | null>(null);
+  const [planExpanded, setPlanExpanded] = useState(true);
 
   // Streaming state
   const [streamingText, setStreamingText] = useState('');
@@ -372,13 +392,58 @@ export function ChatView() {
   ]);
 
   // Run a diagnostic flow (or a starter chip): substitute params, fire send.
+  // M6 — Start the plan-and-execute preview for a flow that ships a `plan`.
+  // Ensures a conversation exists, appends the launching user message, sets
+  // pendingPlan so the PlanEditor renders below the message stream. The
+  // operator clicks "Run plan" in the editor to actually kick off the runner.
+  const startPlanPreview = useCallback(
+    async (flow: TaggedDiagnosticFlow, params: Record<string, string>) => {
+      if (!profileId) return;
+      const now = Date.now();
+      let conversationId = activeId;
+      if (!conversationId) {
+        const fresh: Conversation = {
+          id: `conv_${now}_${Math.random().toString(36).slice(2, 8)}`,
+          title: flow.title.slice(0, 40),
+          createdAt: now,
+          updatedAt: now,
+          messages: [],
+        };
+        await upsert(profileId, fresh);
+        conversationId = fresh.id;
+        setActiveId(fresh.id);
+      }
+      const paramSummary = Object.entries(params)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      const launchText = `Run **${flow.title}**${paramSummary ? ` with ${paramSummary}` : ''}`;
+      await appendMessage(profileId, conversationId, {
+        id: `m_${now}_${Math.random().toString(36).slice(2, 6)}`,
+        role: 'user',
+        content: [{ type: 'text', text: launchText }],
+        ts: now,
+      });
+      setPendingPlan({ flow, params, executionState: null });
+      setPlanExpanded(true);
+    },
+    [profileId, activeId, upsert, appendMessage],
+  );
+
   const handleRunFlow = useCallback(
     async (flow: TaggedDiagnosticFlow, params: Record<string, string> = {}) => {
-      const prompt = substituteFlowPrompt(flow.prompt, params);
       setFlowLauncher(null);
+      if (flow.plan && flow.plan.length > 0) {
+        // M6 plan-and-execute path: append the launching user message +
+        // show the PlanEditor preview. The runner fires when the operator
+        // clicks "Run plan" in the editor.
+        await startPlanPreview(flow, params);
+        return;
+      }
+      // M5 ReAct fall-through: substitute + kick off as a free-form prompt.
+      const prompt = substituteFlowPrompt(flow.prompt, params);
       await handleSend(prompt);
     },
-    [handleSend],
+    [handleSend, startPlanPreview],
   );
 
   // C79 — Regenerate: truncate the conversation back to before the last user
@@ -411,6 +476,246 @@ export function ChatView() {
     });
     await handleSend(lastUserText);
   }, [activeConversation, profileId, running, upsert, handleSend]);
+
+  // M6 — Execute the pending plan via runPlan. Mirrors handleSend's
+  // runReAct event loop but with plan-step-* events folded in to drive the
+  // PlanEditor's per-step status visualisation.
+  const handleRunPlan = useCallback(async () => {
+    if (!pendingPlan || !profileId || !activeId || running) return;
+    if (providerMode === 'anthropic' && hasKey === false) return;
+    const { flow, params } = pendingPlan;
+    const plan = flow.plan;
+    if (!plan || plan.length === 0) return;
+
+    setRunning(true);
+    // Seed every step as pending; runner events flip them to running / done /
+    // skipped / error as they fire.
+    const initial: Record<string, PlanStepExecutionState> = {};
+    for (const step of plan) initial[step.id] = { status: 'pending' };
+    setPendingPlan((p) => (p ? { ...p, executionState: initial } : null));
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStreamingText('');
+    setStreamingToolCalls([]);
+
+    const conversationId = activeId;
+    const connectionIdForDispatch = active?.connectionId;
+    const dispatchTool = async (name: string, args: Record<string, unknown>) => {
+      if (!connectionIdForDispatch) return 'error: no active connection';
+      const outcome = await callTool(connectionIdForDispatch, name, args, {
+        caller: { type: 'ai', conversationId, agentId: 'plan-runner' },
+      });
+      if (outcome.pendingEnqueued) {
+        const result = enqueueAiWrite(
+          connectionIdForDispatch,
+          { name: outcome.pendingEnqueued.toolName, args: outcome.pendingEnqueued.args },
+          { type: 'ai', conversationId },
+        );
+        if (result === 'enqueued') {
+          return 'queued for operator approval — the Changes view now shows this proposed write with an "AI" badge.';
+        }
+        if (result === 'unrenderable') {
+          return 'error: this server has no plugin pending-queue for this write.';
+        }
+        return 'error: no active connection to enqueue the write to';
+      }
+      if (outcome.error) return `error: ${outcome.error.message}`;
+      return outcome.result ?? '';
+    };
+
+    try {
+      const mode = providerMode ?? 'anthropic';
+      const provider = await createProvider(mode);
+      const history = mapHistoryForProvider(activeConversation?.messages ?? []);
+
+      const gen = runPlan({
+        provider,
+        system: contributions.systemPrompt,
+        history,
+        flowId: flow.id,
+        plan,
+        params,
+        tools: llmTools,
+        dispatchTool,
+        signal: controller.signal,
+      });
+
+      // Per-step content accumulator. A `tool-call` step's completion flushes
+      // its tool_use block + the launching turn's tool_result onto the
+      // conversation log as one assistant + one user message; an `llm-step`
+      // flushes its text + (any mid-step tool_use) blocks once `plan-step-
+      // complete` fires.
+      let currentStepId: string | null = null;
+      let stepAssistantBlocks: ContentBlock[] = [];
+      let stepToolUseId: string | null = null;
+      let stepToolArgs: Record<string, unknown> | null = null;
+      let stepToolName: string | null = null;
+      let textBuf = '';
+      let lastTurnUsage: { inputTokens: number; outputTokens: number } | undefined;
+
+      const persistStepMessages = async (
+        stepId: string,
+        kind: 'tool-call' | 'llm-step',
+        toolResult?: unknown,
+      ) => {
+        if (kind === 'tool-call' && stepToolUseId && stepToolName) {
+          // Persist an assistant tool_use turn + a user tool_result turn,
+          // matching the M5 ReAct shape.
+          await appendMessage(profileId, conversationId, {
+            id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            role: 'assistant',
+            content: [
+              {
+                type: 'tool_use',
+                id: stepToolUseId,
+                name: stepToolName,
+                input: stepToolArgs ?? {},
+              },
+            ],
+            ts: Date.now(),
+            planFlowId: flow.id,
+            planStepId: stepId,
+          });
+          await appendMessage(profileId, conversationId, {
+            id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: stepToolUseId,
+                content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+              },
+            ],
+            ts: Date.now(),
+            planFlowId: flow.id,
+            planStepId: stepId,
+          });
+          return;
+        }
+        // llm-step: assistant blocks accumulated during streaming.
+        if (kind === 'llm-step' && stepAssistantBlocks.length > 0) {
+          await appendMessage(profileId, conversationId, {
+            id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            role: 'assistant',
+            content: [...stepAssistantBlocks],
+            ts: Date.now(),
+            planFlowId: flow.id,
+            planStepId: stepId,
+            ...(lastTurnUsage ? { usage: lastTurnUsage } : {}),
+          });
+        }
+      };
+
+      let result = await gen.next();
+      while (!result.done) {
+        const ev = result.value as PlanRunnerEvent;
+        if (ev.type === 'plan-step-start') {
+          currentStepId = ev.stepId;
+          stepAssistantBlocks = [];
+          stepToolUseId = null;
+          stepToolArgs = null;
+          stepToolName = null;
+          textBuf = '';
+          lastTurnUsage = undefined;
+          setPendingPlan((p) =>
+            p && p.executionState
+              ? { ...p, executionState: { ...p.executionState, [ev.stepId]: { status: 'running' } } }
+              : p,
+          );
+        } else if (ev.type === 'plan-step-skip') {
+          setPendingPlan((p) =>
+            p && p.executionState
+              ? {
+                  ...p,
+                  executionState: {
+                    ...p.executionState,
+                    [ev.stepId]: { status: 'skipped', skipReason: ev.reason },
+                  },
+                }
+              : p,
+          );
+        } else if (ev.type === 'plan-step-complete') {
+          if (currentStepId) {
+            await persistStepMessages(currentStepId, ev.kind, ev.result);
+            setPendingPlan((p) =>
+              p && p.executionState
+                ? { ...p, executionState: { ...p.executionState, [currentStepId!]: { status: 'done' } } }
+                : p,
+            );
+          }
+          currentStepId = null;
+          stepAssistantBlocks = [];
+          textBuf = '';
+        } else if (ev.type === 'plan-step-error') {
+          setPendingPlan((p) =>
+            p && p.executionState
+              ? {
+                  ...p,
+                  executionState: {
+                    ...p.executionState,
+                    [ev.stepId]: { status: 'error', errorMessage: ev.message },
+                  },
+                }
+              : p,
+          );
+        } else if (ev.type === 'plan-stop') {
+          // Final state. Collapse the editor for a clean log.
+          setPlanExpanded(false);
+          break;
+        } else if (ev.type === 'text-delta') {
+          textBuf += ev.text;
+          setStreamingText(textBuf);
+        } else if (ev.type === 'text-stop') {
+          stepAssistantBlocks.push({ type: 'text', text: ev.text });
+          textBuf = '';
+          setStreamingText('');
+        } else if (ev.type === 'tool-use-start') {
+          stepToolUseId = ev.toolUseId;
+          stepToolName = ev.name;
+          setStreamingToolCalls((s) => [...s, { id: ev.toolUseId, name: ev.name }]);
+        } else if (ev.type === 'tool-use-complete') {
+          stepToolArgs = ev.input;
+          // tool-use-complete from a plan tool-call step is followed by the
+          // step's plan-step-complete event; persistence happens there.
+        } else if (ev.type === 'message-stop') {
+          lastTurnUsage = ev.usage;
+        }
+        result = await gen.next();
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await appendMessage(profileId, conversationId, {
+        id: `m_${Date.now()}`,
+        role: 'assistant',
+        content: [{ type: 'text', text: `Error: ${msg}` }],
+        marker: 'error',
+        ts: Date.now(),
+      });
+    } finally {
+      abortRef.current = null;
+      setRunning(false);
+      setStreamingText('');
+      setStreamingToolCalls([]);
+    }
+  }, [
+    pendingPlan,
+    profileId,
+    activeId,
+    running,
+    providerMode,
+    hasKey,
+    active?.connectionId,
+    activeConversation,
+    contributions.systemPrompt,
+    llmTools,
+    appendMessage,
+  ]);
+
+  const handleCancelPlan = useCallback(() => {
+    setPendingPlan(null);
+    setPlanExpanded(true);
+  }, []);
 
   const handleLaunchFlow = useCallback((flow: TaggedDiagnosticFlow) => {
     if (!flow.params || flow.params.length === 0) {
@@ -545,6 +850,23 @@ export function ChatView() {
                   : undefined;
               return <MessageView key={m.id} message={m} toolResults={toolResults} />;
             })
+          )}
+          {/* M6 — inline plan editor / runner status when a plan-bearing
+              flow is launched. Renders between the conversation's last
+              message and the in-flight streaming view. */}
+          {pendingPlan && pendingPlan.flow.plan && (
+            <PlanEditor
+              flowTitle={pendingPlan.flow.title}
+              flowDescription={pendingPlan.flow.description}
+              plan={pendingPlan.flow.plan}
+              params={pendingPlan.params}
+              executionState={pendingPlan.executionState ?? undefined}
+              running={running}
+              expanded={planExpanded}
+              onToggleExpanded={() => setPlanExpanded((v) => !v)}
+              onRun={() => void handleRunPlan()}
+              onCancel={handleCancelPlan}
+            />
           )}
           {/* In-flight streaming view (between turn-start and turn-stop) */}
           {(streamingText || streamingToolCalls.length > 0) && (
