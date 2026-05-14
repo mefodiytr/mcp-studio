@@ -2,7 +2,10 @@ import { lazy } from 'react';
 import { Activity, Boxes, ClipboardList, LineChart, List, Network, Terminal } from 'lucide-react';
 import type { Plugin } from '@mcp-studio/plugin-api';
 
+import { NIAGARA_DIAGNOSTIC_FLOWS } from './diagnostic-flows';
 import { NIAGARA_MANIFEST } from './manifest';
+import { NIAGARA_STARTER_QUESTIONS } from './starter-questions';
+import { NIAGARA_SYSTEM_PROMPT } from './system-prompt';
 import { NIAGARA_TOOL_ANNOTATION_OVERRIDES } from './tool-annotations';
 import { NIAGARA_TOOL_HINTS } from './tool-hints';
 
@@ -18,7 +21,8 @@ const ChangesView = lazy(() => import('./views/ChangesView').then((m) => ({ defa
 const HistoryView = lazy(() => import('./views/HistoryView').then((m) => ({ default: m.HistoryView })));
 const MonitorView = lazy(() => import('./views/MonitorView').then((m) => ({ default: m.MonitorView })));
 
-/** The in-box Niagara plugin: a station browser + (M3) write workflow + (M4) observability. */
+/** The in-box Niagara plugin: a station browser + (M3) write workflow + (M4)
+ *  observability + (M5) AI co-pilot contributions. */
 export const niagaraPlugin: Plugin = {
   manifest: NIAGARA_MANIFEST,
   views: [
@@ -32,4 +36,11 @@ export const niagaraPlugin: Plugin = {
   ],
   toolSchemaHints: NIAGARA_TOOL_HINTS,
   toolAnnotationOverrides: NIAGARA_TOOL_ANNOTATION_OVERRIDES,
+  // M5 AI co-pilot contributions (C74). Static for v1 — the system prompt
+  // doesn't depend on the live connection state in M5; M6 may want
+  // ctx.listTools()-driven feature-detection to add "if getTrendAnalysis is
+  // available, prefer it" guidance per handover §7.
+  systemPrompt: () => NIAGARA_SYSTEM_PROMPT,
+  starterQuestions: () => NIAGARA_STARTER_QUESTIONS,
+  diagnosticFlows: () => NIAGARA_DIAGNOSTIC_FLOWS,
 };
