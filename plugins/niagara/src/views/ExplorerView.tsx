@@ -30,6 +30,7 @@ const INDENT_PX = 14;
  */
 export function ExplorerView({ ctx }: { ctx: PluginContext }) {
   const selected = useExplorerStore((s) => s.selected);
+  const known = useExplorerStore((s) => s.known);
   const reveal = useExplorerStore((s) => s.reveal);
   const select = useExplorerStore((s) => s.select);
 
@@ -57,6 +58,37 @@ export function ExplorerView({ ctx }: { ctx: PluginContext }) {
     select(taken.ord);
     ctx.setCwd(taken.ord);
   }, [pendingOrdNav, consumeOrdNav, reveal, select, ctx]);
+
+  // **M6 C87** — publish the current selection onto the host bus so the
+  // chat empty state's diagnostic-flow buttons + the command palette can
+  // decorate themselves with the operator's current focus ("Run rooftop
+  // diagnosis on `AHU-1`" instead of "Run rooftop diagnosis"). Resolves
+  // the display label from the explorer's `known` cache (the M2-era
+  // ord→node map every cross-view consumer reads; see CONTRIBUTING.md
+  // "Cross-view explorer state" for its contract). Publishes null when
+  // the selection clears + on unmount so stale selections from a closed
+  // Explorer don't leak into other views' UI.
+  const publishSelectedOrd = useHostBus((s) => s.publishSelectedOrd);
+  useEffect(() => {
+    if (!selected) {
+      publishSelectedOrd(null);
+      return;
+    }
+    const node = known.get(selected);
+    const label = node?.displayName || node?.name;
+    publishSelectedOrd({
+      ord: selected,
+      ...(label ? { displayName: label } : {}),
+    });
+  }, [selected, known, publishSelectedOrd]);
+  useEffect(
+    () => () => {
+      // Unmount: stop publishing the now-hidden selection. The chat empty
+      // state should fall back to its no-selection rendering.
+      publishSelectedOrd(null);
+    },
+    [publishSelectedOrd],
+  );
 
   return (
     <div className="flex h-full flex-col">

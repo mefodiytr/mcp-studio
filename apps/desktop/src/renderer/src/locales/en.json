@@ -70,6 +70,7 @@
     },
     "starterQuestionsHeading": "Try asking",
     "diagnosticFlowsHeading": "Diagnostic flows",
+    "diagnosticFlowOnSelection": "{{title}} on `{{selection}}`",
     "flowRun": "Run",
     "flowCancel": "Cancel",
     "regenerate": "Regenerate",
@@ -366,6 +367,7 @@
     "toggleTheme": "Toggle theme",
     "reloadWindow": "Reload window",
     "runFlow": "Run diagnostic flow: {{name}}",
+    "runFlowOnSelection": "Run diagnostic flow: {{name}} on `{{selection}}`",
     "group": {
       "go": "Go to",
       "view": "View",

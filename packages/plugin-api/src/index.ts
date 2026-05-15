@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import { z } from 'zod';
 
-export { useHostBus } from './host-bus';
+export { useHostBus, type HostBusSelection } from './host-bus';
 
 /**
  * The plugin contract — what an in-box plugin (e.g. Niagara) exposes to the

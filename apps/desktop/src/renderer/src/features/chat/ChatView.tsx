@@ -11,6 +11,7 @@ import {
   type RunnerEvent,
 } from '@mcp-studio/llm-provider';
 import { enqueueAiWrite } from '@mcp-studio/niagara';
+import { useHostBus, type HostBusSelection } from '@mcp-studio/plugin-api';
 
 import type { Conversation, ContentBlock, Message } from '../../../../shared/domain/conversations';
 
@@ -35,6 +36,7 @@ import {
   substituteFlowPrompt,
   type TaggedDiagnosticFlow,
 } from '@renderer/lib/plugin-prompts';
+import { preselectionForLaunch, selectionLabel } from '@renderer/lib/host-selection';
 import {
   resolveSummariserModel,
   runSummariser,
@@ -889,6 +891,14 @@ export function ChatView() {
     setPlanExpanded(true);
   }, []);
 
+  // **M6 C87** — current cross-plugin selection (e.g. Niagara Explorer's
+  // selected node). Used to (a) decorate diagnostic-flow buttons with "on
+  // `AHU-1`" suffixes + (b) pre-fill the first text param of a launched
+  // flow with the selection's display label. The bus is the only seam —
+  // the chat view does not import the niagara explorer-store directly
+  // (would invert the host/plugin dependency direction).
+  const hostSelection = useHostBus((s) => s.selectedOrd);
+
   const handleLaunchFlow = useCallback((flow: TaggedDiagnosticFlow) => {
     if (!flow.params || flow.params.length === 0) {
       void handleRunFlow(flow, {});
@@ -896,8 +906,18 @@ export function ChatView() {
     }
     const initial: Record<string, string> = {};
     for (const p of flow.params) initial[p.name] = '';
+    // **M6 C87** — if the operator has a current Niagara selection, pre-fill
+    // the FIRST text param with its display label (or ord as fallback).
+    // The launcher dialog still opens so the operator can confirm / edit;
+    // we just save a copy-paste step from the explorer.
+    if (hostSelection) {
+      const firstParam = flow.params[0];
+      if (firstParam) {
+        initial[firstParam.name] = preselectionForLaunch(hostSelection);
+      }
+    }
     setFlowLauncher({ flow, paramValues: initial });
-  }, [handleRunFlow]);
+  }, [handleRunFlow, hostSelection]);
 
   // C79 — keyboard shortcuts. Mounted at the chat-view component level so
   // they're only active while the chat rail is open (unmount on view-switch
@@ -1024,6 +1044,7 @@ export function ChatView() {
               onKeySaved={() => setHasKey(true)}
               starterQuestions={contributions.starterQuestions}
               diagnosticFlows={contributions.diagnosticFlows}
+              hostSelection={hostSelection}
               onPickStarter={(text) => void handleSend(text)}
               onLaunchFlow={handleLaunchFlow}
             />
@@ -1192,6 +1213,7 @@ function EmptyState({
   onKeySaved,
   starterQuestions,
   diagnosticFlows,
+  hostSelection,
   onPickStarter,
   onLaunchFlow,
 }: {
@@ -1200,6 +1222,7 @@ function EmptyState({
   onKeySaved: () => void;
   starterQuestions: string[];
   diagnosticFlows: TaggedDiagnosticFlow[];
+  hostSelection: HostBusSelection | null;
   onPickStarter: (text: string) => void;
   onLaunchFlow: (flow: TaggedDiagnosticFlow) => void;
 }) {
@@ -1253,17 +1276,32 @@ function EmptyState({
             {t('chat.diagnosticFlowsHeading')}
           </h3>
           <div className="flex flex-wrap justify-start gap-2">
-            {diagnosticFlows.map((flow) => (
-              <Button
-                key={flow.id}
-                variant="outline"
-                size="sm"
-                onClick={() => onLaunchFlow(flow)}
-                title={flow.description}
-              >
-                {flow.title}
-              </Button>
-            ))}
+            {diagnosticFlows.map((flow) => {
+              // **M6 C87** — decorate flow labels with the host selection
+              // when the flow has at least one templatable param AND the
+              // host bus has a current selection. Parameterless flows
+              // (e.g. knowledge-summary) keep their plain title — the
+              // selection wouldn't influence the run.
+              const decorate =
+                hostSelection !== null && flow.params !== undefined && flow.params.length > 0;
+              const label = decorate
+                ? t('chat.diagnosticFlowOnSelection', {
+                    title: flow.title,
+                    selection: selectionLabel(hostSelection!),
+                  })
+                : flow.title;
+              return (
+                <Button
+                  key={flow.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onLaunchFlow(flow)}
+                  title={flow.description}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}

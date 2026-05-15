@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { useHostBus } from '@mcp-studio/plugin-api';
 
 import { signOutOAuth } from '@renderer/lib/auth';
 import { connectProfile, disconnectConnection, useConnections } from '@renderer/lib/connections';
@@ -9,6 +10,7 @@ import { describeError } from '@renderer/lib/errors';
 import { clearHistory, useHistory } from '@renderer/lib/history';
 import { buildPluginContext } from '@renderer/lib/plugin-context';
 import { collectStaticContributions } from '@renderer/lib/plugin-prompts';
+import { selectionLabel } from '@renderer/lib/host-selection';
 import { useProfiles } from '@renderer/lib/profiles';
 import { useTheme } from '@renderer/lib/theme';
 import { callTool } from '@renderer/lib/tools';
@@ -63,6 +65,11 @@ export function useAppCommands({
   const connections = useConnections();
   const profilesQuery = useProfiles();
   const historyQuery = useHistory();
+  // **M6 C87** — host-bus selection drives "Run rooftop diagnosis on `AHU-1`"
+  // entries (vs the plain "Run rooftop diagnosis") when the operator has a
+  // current pick in the Niagara Explorer. The palette rebuilds when the
+  // selection changes (memo dep) so the title stays in sync.
+  const hostSelection = useHostBus((s) => s.selectedOrd);
 
   return useMemo(() => {
     const groups = {
@@ -198,9 +205,18 @@ export function useAppCommands({
       // (M6 C84) is awaited at runner-launch time, not here.
       const contributions = collectStaticContributions([plugin], ctx);
       for (const flow of contributions.diagnosticFlows) {
+        // **M6 C87** — same decoration rule as the chat empty state's
+        // diagnostic-flow buttons (selectionLabel). Parameterless flows
+        // keep their plain title.
+        const decorate =
+          hostSelection !== null && flow.params !== undefined && flow.params.length > 0;
+        const titleKey = decorate ? 'commandPalette.runFlowOnSelection' : 'commandPalette.runFlow';
+        const title = decorate
+          ? t(titleKey, { name: flow.title, selection: selectionLabel(hostSelection!) })
+          : t(titleKey, { name: flow.title });
         list.push({
           id: `assistant.flow.${flow.id}`,
-          title: t('commandPalette.runFlow', { name: flow.title }),
+          title,
           group: flowGroup,
           keywords: `${flow.id} ${flow.title} ${flow.description} ${flow.pluginName} diagnostic flow`,
           run: () => {
@@ -224,5 +240,6 @@ export function useAppCommands({
     setView,
     setInspectorOpen,
     pluginConnection,
+    hostSelection,
   ]);
 }
