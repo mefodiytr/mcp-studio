@@ -133,6 +133,34 @@ describe('ConversationRepository', () => {
     expect(repo2.get('p1', 'c1')).toMatchObject({ id: 'c1', title: 'conv c1' });
   });
 
+  it("persists 'summary' marker messages — Zod round-trip + reopen (promt19 edge case #5)", () => {
+    // Verify the M6 C86 collapsible-summary marker survives the
+    // workspace's JsonStore round-trip (write → read → validate). The
+    // marker enum was widened in C83b to include 'summary'; this test
+    // pins that the additive schema change works end-to-end.
+    const summaryMessage: Message = {
+      id: 'm_summary_1',
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Earlier: investigated AHU-1; no alarms.' }],
+      marker: 'summary',
+      usage: { inputTokens: 1200, outputTokens: 180 },
+      ts: 1500,
+    };
+    const store1 = createWorkspaceStore(dir);
+    const repo1 = new ConversationRepository(store1);
+    repo1.save('p1', mkConversation('c1', 1500, [summaryMessage]));
+
+    const store2 = createWorkspaceStore(dir);
+    const repo2 = new ConversationRepository(store2);
+    const reloaded = repo2.get('p1', 'c1');
+    expect(reloaded?.messages).toHaveLength(1);
+    expect(reloaded?.messages[0]).toMatchObject({
+      marker: 'summary',
+      content: [{ type: 'text', text: 'Earlier: investigated AHU-1; no alarms.' }],
+      usage: { inputTokens: 1200, outputTokens: 180 },
+    });
+  });
+
   it('migrates an older v3 workspace file to v4 idempotently (re-run is a no-op)', () => {
     // Simulate an existing v3 file by writing a workspace with the v3 shape.
     // The migrator should add `conversations` + `llm` without losing v3 fields.

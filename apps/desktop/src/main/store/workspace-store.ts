@@ -11,6 +11,16 @@ export interface WorkspaceLlmSettings {
   /** Active provider — `'anthropic'` in v1; `'openai'` / `'ollama'` slots in
    *  for M7+ once adapters land. */
   provider: 'anthropic';
+  /** **M6 C86** — which model to use for the head-trim summarisation call.
+   *  `'haiku'` (default — claude-haiku-4-5, ~20× cheaper than opus; right
+   *  trade-off for the summary turn). `'sonnet'` if real-world summaries
+   *  lose key context (3× cheaper than opus, substantially better fluency
+   *  than haiku — the m6-followup escalation). `'opus'` for parity-debug.
+   *  `'same-as-main'` — uses whatever model the active conversation runs
+   *  (useful when iterating on prompt quality without splitting cost
+   *  models). Field is optional + reads defensively in the migrator so M5
+   *  workspaces continue to load (treated as `'haiku'`). */
+  summariserModel?: 'haiku' | 'sonnet' | 'opus' | 'same-as-main';
 }
 
 export interface WorkspaceData {
@@ -62,13 +72,23 @@ export function createWorkspaceStore(userDataDir: string): JsonStore<WorkspaceDa
           obj.conversations && typeof obj.conversations === 'object' && !Array.isArray(obj.conversations)
             ? obj.conversations
             : {},
-        llm:
-          obj.llm && typeof obj.llm === 'object' && !Array.isArray(obj.llm)
-            ? {
-                provider: obj.llm.provider === 'anthropic' ? 'anthropic' : 'anthropic',
-              }
-            : { provider: 'anthropic' },
+        llm: parseLlmSettings(obj.llm),
       };
     },
   });
+}
+
+/** Permissively parse the `llm` field. M5 workspaces ship without
+ *  `summariserModel` (additive in M6 C86 — no version bump); the migrator
+ *  drops it from the stored shape if absent so re-runs are no-ops. */
+function parseLlmSettings(raw: unknown): WorkspaceLlmSettings {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { provider: 'anthropic' };
+  const obj = raw as Partial<WorkspaceLlmSettings>;
+  const summariser = obj.summariserModel;
+  return {
+    provider: obj.provider === 'anthropic' ? 'anthropic' : 'anthropic',
+    ...(summariser === 'haiku' || summariser === 'sonnet' || summariser === 'opus' || summariser === 'same-as-main'
+      ? { summariserModel: summariser }
+      : {}),
+  };
 }

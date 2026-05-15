@@ -219,8 +219,13 @@ export const invokeChannels = {
   'llm:config': {
     request: z.object({}),
     /** Renderer reads this once at chat-session start to pick mock vs real
-     *  provider (env-driven; the e2e specs set MCPSTUDIO_LLM_PROVIDER=mock). */
-    response: z.object({ provider: z.enum(['anthropic', 'mock']) }),
+     *  provider (env-driven; the e2e specs set MCPSTUDIO_LLM_PROVIDER=mock).
+     *  **M6 C86** — also surfaces the workspace-stored `summariserModel`
+     *  preference (default `'haiku'` per promt17 D5). */
+    response: z.object({
+      provider: z.enum(['anthropic', 'mock']),
+      summariserModel: z.enum(['haiku', 'sonnet', 'opus', 'same-as-main']),
+    }),
   },
   'llm:hasKey': {
     request: z.object({ provider: z.string() }),

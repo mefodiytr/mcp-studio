@@ -35,6 +35,12 @@ import {
   substituteFlowPrompt,
   type TaggedDiagnosticFlow,
 } from '@renderer/lib/plugin-prompts';
+import {
+  resolveSummariserModel,
+  runSummariser,
+  SUMMARY_TRIGGER_THRESHOLD,
+  type SummariserModelPreference,
+} from '@renderer/lib/summariser';
 import { cn } from '@renderer/lib/utils';
 import { pickPlugin } from '@renderer/plugins/registry';
 import {
@@ -82,6 +88,7 @@ export function ChatView() {
   const remove = useConversationsStore((s) => s.remove);
   const appendMessage = useConversationsStore((s) => s.appendMessage);
   const patchInflight = useConversationsStore((s) => s.patchInflight);
+  const summariseAndTrim = useConversationsStore((s) => s.summariseAndTrim);
 
   // C75: the active connection's tool catalog, mapped to the LlmTool shape
   // the ReAct loop hands the provider. The safety boundary at main intercepts
@@ -132,6 +139,16 @@ export function ChatView() {
   // assemble time (the M6 D4 lazy-first-turn enrichment for niagaramcp's
   // getKnowledgeSummary). Cleared on the next conversation switch.
   const [systemPromptWarnings, setSystemPromptWarnings] = useState<string[]>([]);
+
+  // M6 C86 — summariser fallback chip. Lifts when an LLM summarisation call
+  // failed and we silently dropped older messages instead (promt19 edge case
+  // #1). Cleared on conversation switch + on the next successful summary.
+  const [summaryFallbackForConversationId, setSummaryFallbackForConversationId] = useState<string | null>(null);
+  // C86 — guards re-entrant summarise triggers. Without this, the
+  // messages.length useEffect could fire `summariseAndTrim` twice in quick
+  // succession on overlapping renders before the first call's persistence
+  // settles back through the store.
+  const summarisingRef = useRef(false);
 
   // Helper to build the full async system prompt at runner-launch time.
   // Memoised on `active` so handleSend / handleRunPlan get the same
@@ -249,6 +266,92 @@ export function ChatView() {
       if (first) setActiveId(first.id);
     }
   }, [activeId, conversations]);
+
+  // M6 C86 — clear the summariser-fallback chip when the operator switches
+  // conversations (the chip is per-conversation, not global).
+  useEffect(() => {
+    if (summaryFallbackForConversationId && summaryFallbackForConversationId !== activeId) {
+      setSummaryFallbackForConversationId(null);
+    }
+  }, [activeId, summaryFallbackForConversationId]);
+
+  /**
+   * **M6 C86 — auto-summarise on threshold.** When the active conversation's
+   * `messages.length` crosses `SUMMARY_TRIGGER_THRESHOLD` (180), kick off
+   * the summariser → replace the first `HEAD_SLICE_COUNT` (100) messages
+   * with a single `marker: 'summary'` assistant message. Fires once per
+   * crossing (the `summarisingRef` guard); cancelled if the operator
+   * switches conversations mid-flight (`AbortController.abort()`).
+   *
+   * Threshold (180) sits 20 below `MAX_MESSAGES_PER_CONVERSATION` (200) so
+   * the summary call has runway before the main-side head-trim silent-drop
+   * kicks in (M5 safety net stays as the last line of defence).
+   *
+   * Per promt19:
+   *   - Summary call usage is captured on the synthetic message (the
+   *     UsageBadge picks it up via the conversation's normal `usage` aggregate;
+   *     workspace-global session spend likewise — both feed off the same
+   *     `message.usage` field).
+   *   - Failure / abort → graceful degradation (silent drop) + warning chip.
+   *   - Cancellation threads `AbortSignal` through to the runSummariser call.
+   */
+  useEffect(() => {
+    if (!activeConversation || !profileId) return;
+    if (summarisingRef.current) return;
+    if (activeConversation.messages.length < SUMMARY_TRIGGER_THRESHOLD) return;
+    if (providerMode === null) return;
+    if (providerMode === 'anthropic' && hasKey !== true) return;
+    summarisingRef.current = true;
+    const controller = new AbortController();
+    const conversationIdSnapshot = activeConversation.id;
+
+    void (async () => {
+      try {
+        const { summariserModel } = await bridge().invoke('llm:config', {});
+        const preference: SummariserModelPreference = summariserModel;
+        const conversationModel = activeConversation.model ?? undefined;
+        const resolvedModel = resolveSummariserModel(preference, conversationModel);
+        const mode = providerMode ?? 'anthropic';
+        const provider = await createProvider(mode);
+        const result = await summariseAndTrim(profileId, conversationIdSnapshot, {
+          summarise: (headSlice) =>
+            runSummariser({
+              provider,
+              headSlice,
+              model: resolvedModel,
+              signal: controller.signal,
+            }),
+        });
+        if (result.outcome === 'dropped') {
+          // Surface the fallback chip; clear it on the next successful trim.
+          setSummaryFallbackForConversationId(conversationIdSnapshot);
+        } else if (result.outcome === 'summarised') {
+          setSummaryFallbackForConversationId((prev) => (prev === conversationIdSnapshot ? null : prev));
+        }
+      } catch {
+        // Last-resort guard: never let the summariser path break the chat.
+        // (The summariser already swallows errors; this is belt-and-braces
+        // for the IPC / provider-factory layer.)
+        setSummaryFallbackForConversationId(conversationIdSnapshot);
+      } finally {
+        summarisingRef.current = false;
+      }
+    })();
+    return () => {
+      // Conversation switch / unmount → cancel any in-flight summariser call.
+      controller.abort();
+    };
+    // We intentionally depend on `messages.length` (not the full array) so
+    // we re-fire on growth but not on the in-place patchInflight updates
+    // that share the message reference.
+  }, [
+    activeConversation,
+    activeConversation?.messages.length,
+    profileId,
+    providerMode,
+    hasKey,
+    summariseAndTrim,
+  ]);
 
   const handleNew = useCallback(() => {
     setActiveId(null);
@@ -884,6 +987,14 @@ export function ChatView() {
                   })}
                 >
                   {t('chat.systemPromptTimeoutBadge')}
+                </span>
+              )}
+              {summaryFallbackForConversationId === activeConversation?.id && (
+                <span
+                  className="ml-2 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700 dark:text-amber-300"
+                  title={t('chat.summaryFallbackTitle')}
+                >
+                  {t('chat.summaryFallbackBadge')}
                 </span>
               )}
             </p>

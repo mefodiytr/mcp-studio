@@ -166,7 +166,7 @@ if (!gotSingleInstanceLock) {
     registerHistoryHandlers(toolHistory);
     registerWatchHandlers(watches);
     registerConversationHandlers(conversations);
-    registerLlmHandlers(vault);
+    registerLlmHandlers(vault, workspaceStore);
     stopDemoEvents = startDemoEventSource();
 
     createMainWindow();

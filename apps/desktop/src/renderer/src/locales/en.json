@@ -100,8 +100,12 @@
     "marker": {
       "aborted": "stopped by user",
       "max-turns-reached": "reasoning limit reached",
-      "error": "error"
-    }
+      "error": "error",
+      "summary": "earlier messages summarised",
+      "summaryEmpty": "(empty summary)"
+    },
+    "summaryFallbackBadge": "Summary unavailable — older messages dropped",
+    "summaryFallbackTitle": "The summary call failed; the oldest messages were dropped to make room. Cost-credited usage is unaffected."
   },
   "plugins": {
     "unavailable": "This plugin view isn't available — its connection may have closed."

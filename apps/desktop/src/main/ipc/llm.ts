@@ -1,5 +1,7 @@
 import { SystemPromptCache } from '../cache/system-prompt-cache';
 import type { CredentialVault } from '../store/credential-vault';
+import type { JsonStore } from '../store/json-store';
+import type { WorkspaceData } from '../store/workspace-store';
 import { handle } from './index';
 
 /**
@@ -23,11 +25,12 @@ import { handle } from './index';
  * immediately + fires a fire-and-forget background refresh; on cache miss
  * the chat-runner blocks first turn for up to 10s (M6 D4 promt17 nuance).
  */
-export function registerLlmHandlers(vault: CredentialVault): void {
+export function registerLlmHandlers(vault: CredentialVault, workspace: JsonStore<WorkspaceData>): void {
   const cache = new SystemPromptCache();
 
   handle('llm:config', () => ({
     provider: process.env.MCPSTUDIO_LLM_PROVIDER === 'mock' ? ('mock' as const) : ('anthropic' as const),
+    summariserModel: workspace.data.llm.summariserModel ?? 'haiku',
   }));
   handle('llm:hasKey', ({ provider }) => ({
     hasKey: vault.hasLlmKey(provider),

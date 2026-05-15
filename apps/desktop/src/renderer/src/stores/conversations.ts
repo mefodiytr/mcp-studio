@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 import type { Conversation, Message } from '../../../shared/domain/conversations';
+import type { LlmUsage } from '@mcp-studio/llm-provider';
+
+import { computeHeadSlice, type SummariserResult } from '../lib/summariser';
 
 function bridge(): NonNullable<typeof window.studio> {
   if (!window.studio) throw new Error('IPC bridge unavailable');
@@ -41,7 +44,34 @@ interface ConversationsState {
     conversationId: string,
     patcher: (c: Conversation) => Conversation,
   ) => void;
+  /** **M6 C86 — head-trim with LLM summarisation.** Slices the conversation
+   *  into head (to summarise) + tail (to keep); calls `opts.summarise(head)`
+   *  for the replacement text; on success, replaces the head with a single
+   *  synthetic `marker: 'summary'` assistant message and persists; on null
+   *  (failure / abort — never throws), drops the head silently and signals
+   *  `outcome: 'dropped'` so the caller can surface a warning chip.
+   *
+   *  The `summarise` callback is the injection seam: the caller (ChatView)
+   *  builds the LlmProvider + resolves the summariser model + threads its
+   *  AbortSignal. This keeps the store free of provider/IPC dependencies
+   *  for testing.
+   *
+   *  Re-summarisation continuity (promt19 edge case #4) is handled by
+   *  `computeHeadSlice` — a prior `'summary'` marker is consumed into the
+   *  next head slice, so the single summary marker grows in scope. */
+  summariseAndTrim: (
+    profileId: string,
+    conversationId: string,
+    opts: {
+      summarise: (headSlice: readonly Message[]) => Promise<SummariserResult | null>;
+    },
+  ) => Promise<SummariseAndTrimResult>;
 }
+
+export type SummariseAndTrimResult =
+  | { outcome: 'noop'; reason: 'missing-conversation' | 'no-head-to-trim'; conversation: null }
+  | { outcome: 'summarised'; conversation: Conversation; usage: LlmUsage | null }
+  | { outcome: 'dropped'; conversation: Conversation; reason: 'summariser-returned-null' };
 
 const EMPTY: readonly Conversation[] = [];
 
@@ -117,7 +147,75 @@ export const useConversationsStore = create<ConversationsState>((set, get) => ({
       };
     });
   },
+
+  async summariseAndTrim(profileId, conversationId, opts) {
+    const list = get().conversationsByProfile[profileId] ?? [];
+    const current = list.find((c) => c.id === conversationId);
+    if (!current) {
+      return { outcome: 'noop', reason: 'missing-conversation', conversation: null };
+    }
+    const { headSlice, tail } = computeHeadSlice(current.messages);
+    if (headSlice.length === 0) {
+      return { outcome: 'noop', reason: 'no-head-to-trim', conversation: null };
+    }
+    const summary = await opts.summarise(headSlice);
+
+    if (summary === null) {
+      // **Graceful degradation** (promt19 edge case #1 + #2). Drop the head
+      // slice silently, preserving the tail. No synthetic marker — the
+      // operator hasn't been informed via this branch; the caller surfaces a
+      // warning chip if appropriate. This is the M5 head-trim behaviour
+      // (silent drop-oldest) re-used as the summariser's fallback path.
+      const trimmed: Conversation = {
+        ...current,
+        messages: tail,
+        updatedAt: Date.now(),
+      };
+      await bridge().invoke('conversations:save', { profileId, conversation: trimmed });
+      set((s) => upsertInList(s, profileId, trimmed));
+      return { outcome: 'dropped', conversation: trimmed, reason: 'summariser-returned-null' };
+    }
+
+    // Successful summarisation. The replacement is a single synthetic
+    // assistant message with `marker: 'summary'`, carrying the summariser
+    // call's usage so the UsageBadge + workspace-global spend totals see it
+    // (promt19: "Summary call usage credits both UsageBadge AND workspace-
+    // global session spend"). The MessageView renders it as a collapsible
+    // card (default collapsed; expandable to reveal the summary text).
+    const summaryMessage: Message = {
+      id: `m_summary_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      role: 'assistant',
+      content: [{ type: 'text', text: summary.text }],
+      marker: 'summary',
+      ts: Date.now(),
+      ...(summary.usage ? { usage: summary.usage } : {}),
+    };
+    const next: Conversation = {
+      ...current,
+      messages: [summaryMessage, ...tail],
+      updatedAt: Date.now(),
+    };
+    await bridge().invoke('conversations:save', { profileId, conversation: next });
+    set((s) => upsertInList(s, profileId, next));
+    return { outcome: 'summarised', conversation: next, usage: summary.usage };
+  },
 }));
+
+/** Shared in-list upsert helper for the immutable Zustand state updates. */
+function upsertInList(
+  s: ConversationsState,
+  profileId: string,
+  conversation: Conversation,
+): Partial<ConversationsState> {
+  const existing = s.conversationsByProfile[profileId] ?? [];
+  const idx = existing.findIndex((c) => c.id === conversation.id);
+  const next = idx >= 0 ? [...existing] : [...existing, conversation];
+  if (idx >= 0) next[idx] = conversation;
+  next.sort((a, b) => b.updatedAt - a.updatedAt);
+  return {
+    conversationsByProfile: { ...s.conversationsByProfile, [profileId]: next },
+  };
+}
 
 /** Stable selector — returns the shared `EMPTY` reference when a profile has
  *  no conversations (the React #185 guard; see store comment). */
