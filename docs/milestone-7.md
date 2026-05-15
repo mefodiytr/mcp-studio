@@ -64,6 +64,16 @@ Three credible local-vector-store choices:
 
 **Fallback path** (D1 contingency, not the primary): if sqlite-vec proves fragile on Windows (or the per-arch build pipeline blocks releases), switch to LanceDB in a single C-commit. The vector-store interface in `packages/rag` is an internal trait (`VectorStore` with `upsert / search / delete / size` methods); the sqlite-vec impl is one file; a LanceDB impl is another. Decision lever held during Phase A; locked in by C91 commit.
 
+**D1 nuance (promt22) — platform smoke test before workspace migration.** The "single native-module foothold, used twice" plan is **double-or-nothing** if sqlite-vec fails to load on a target platform: the workspace store has already migrated to sqlite + the RAG store hasn't shipped yet → operators stuck on a broken release. To prevent that:
+
+- **C91 acceptance criterion (hard gate)**: the sqlite-vec extension must compile + load + execute basic vector ops (`vec0` virtual table create / insert / `vec_distance_cosine` query) on **Windows + macOS + Linux** before C92 lands. A `packages/rag/smoke/platform-smoke.mjs` script does the round-trip; the `package.yml` CI workflow runs it on the existing win-x64 + macos-arm64 + linux-x64 matrix.
+- **If the smoke fails on any platform at C91**: two responses, decided at smoke-fail time:
+  1. **Switch the v1 vector store to LanceDB** (the contingency path above) — keep the M1-followup workspace migration as a separate later-milestone item. Phase A re-scopes to "RAG package with LanceDB" + C92 deferred.
+  2. **Defer the workspace migration to a separate later milestone** even if sqlite-vec works for RAG — proceed with sqlite-vec for the rag.db only; keep `workspace.json` as-is. This is the lower-risk middle ground if sqlite-vec works *as a loadable extension* but the broader sqlite-vs-JSON migration surfaces unforeseen issues (e.g. concurrent-write semantics, lock contention).
+- **Don't proceed with the combined-migration plan without verification.** The C91 commit message explicitly carries the smoke-pass / smoke-fail outcome; C92 only commits if C91's smoke passed on all three platforms.
+
+Local-dev smoke (the C91 author's machine — Windows in the current build) runs as part of the C91 commit's gates. The cross-platform run via CI is a separate workflow trigger — manually invoked on the C91 PR, results pasted into the "Adjustments during the M7 build" section before C92 begins.
+
 ### D2 — Embedding model + where embeddings run: **OpenAI `text-embedding-3-small` by default; main-process embed calls; per-workspace override to a local Ollama model**
 
 Three axes here:
@@ -82,6 +92,14 @@ Three axes here:
 
 **Implementation note**: switching the embedding provider after a workspace has indexed documents is a re-index event (different dimensions don't compose). The settings UI surfaces this clearly ("Switching embedding model re-indexes all documents on next upload"); we record the embedding-model name + dimensions on the `documents` row + refuse to add chunks with mismatched dimensions until the operator clicks "Re-index all".
 
+**D2 nuance (promt22) — dimension-consistency UI guard.** Silent dimension mismatch (OpenAI's 1536-dim vectors stored alongside Ollama's 768-dim vectors) yields garbage search results — the cosine over a left-padded or truncated vector ranks unrelated chunks similar. The guard:
+
+- **Workspace settings store the active embedding dimension** alongside the provider + model (`embeddingDimension: number` on `WorkspaceLlmSettings`). Set on first successful upload; read on every chat-turn retrieval.
+- **Provider/model switch is a destructive action.** The settings UI presents the switch as a confirm dialog with the loud language: "Switching embedding provider will require re-indexing all N documents (current: OpenAI text-embedding-3-small, 1536 dims; new: Ollama nomic-embed-text, 768 dims). Cancel to keep current setup, or confirm to begin re-indexing." Two buttons: "Re-index all N documents" (destructive-styled) + "Cancel".
+- **On confirm**: the workspace flips its embedding-dimension field, drops all `embeddings` rows (the vec0 table contents — fast), iterates `documents` + re-embeds + re-inserts. Progress UI: a per-document spinner in the library + a top-level "Re-indexing 3/12 documents" toast. Cancellation supported via AbortSignal (the in-flight embedding call aborts; the worker leaves the workspace in a partial-reindex state recorded as `dimensionMismatchPending: true`; the next upload triggers a re-index prompt).
+- **Cold workspace (no documents yet)** — the switch is free; the dialog reduces to a confirm "Switch to <provider/model>?".
+- **The retrieval pass refuses to run when `dimensionMismatchPending: true`**: the chat-turn injection skips with a chip ("Knowledge retrieval paused — re-index in progress / required"). Manual chat continues unaffected.
+
 ### D3 — Chunking strategy: **markdown-header-aware for `.md`; page-bounded sentence-aware for PDFs; fixed-size with overlap for plaintext**
 
 Three credible chunking shapes:
@@ -90,15 +108,17 @@ Three credible chunking shapes:
 - (b) **Sentence-aware** — split on sentence boundaries (regex-based for v1; a sentence-tokenizer if v2 needs it). Avoids cutting mid-sentence; chunks vary in size.
 - (c) **Document-structure aware** — markdown headers split markdown; PDF pages bound chunks; plaintext falls back to (a). The structure-aware chunk carries its heading / page as metadata + the LLM gets "from page 17 of RTU-Manual.pdf, §3.2 Alarm reset procedure" as a citation context.
 
-**Recommendation: (c).** Three concrete strategies in `packages/rag/src/chunking.ts`:
+**Recommendation: (c) with character-bounded caps (promt22 nuance).** Three concrete strategies in `packages/rag/src/chunking.ts`:
 
-- **Markdown** (`.md` / `.mdx`): parse via `remark-gfm` (already in the workspace for the M5 chat markdown renderer — single source); each H1/H2/H3 starts a new chunk; chunks under 200 tokens merge with the next; chunks over 1000 tokens split on paragraphs. Metadata: `{ section: 'H1 > H2 > H3 path' }`.
-- **PDF** (`.pdf`): extract text per page via `pdf-parse` (or `pdfjs-dist` if `pdf-parse` proves too lossy on niagara station manuals — judgement at C92 time). Each page is a chunk if ≤ 1000 tokens; larger pages split on paragraph boundaries (double-newline). Metadata: `{ page: number }`. Whole-page chunks preserve table context (critical for the manuals scenario).
-- **Plaintext** (`.txt` / `.log`): fixed 500-token windows with 50-token overlap (the baseline). Metadata: `{ char_start, char_end }`.
+- **Markdown** (`.md` / `.mdx`): parse via `remark-gfm` (already in the workspace for the M5 chat markdown renderer — single source); each H1/H2/H3 starts a new chunk; chunks under 600 chars merge with the next; chunks over `MAX_CHARS` (1500) split on paragraphs. Metadata: `{ section: 'H1 > H2 > H3 path' }`.
+- **PDF** (`.pdf`): extract text per page via `pdf-parse` (or `pdfjs-dist` if `pdf-parse` proves too lossy on niagara station manuals — judgement at C92 time). Each page is a chunk if ≤ `MAX_CHARS`; larger pages split on paragraph boundaries (double-newline) into multiple chunks. Metadata: `{ page: number }`. Whole-page chunks preserve table context (critical for the manuals scenario).
+- **Plaintext** (`.txt` / `.log`): fixed 1500-char windows with 200-char overlap. Metadata: `{ char_start, char_end }`.
 
 **Plugin-contributed chunking override** — a future seam (`Plugin.chunker?: (doc) => Chunk[]`); not M7. v1 chunks via the three built-in strategies above. The seam is sketched in `m7-followups.md` for niagara-specific runbook structure if real-world operator workflow shows the need.
 
-**Token counting**: `tiktoken` (the JS port) for OpenAI; approximate-via-character-count for the Ollama path (Ollama doesn't expose a tokeniser). Approximate is fine for chunking — the 500-token target is a soft hint, not a hard cap.
+**D3 nuance (promt22) — character-bounded, not token-bounded.** No client-side tokenizer dependency in v1. `MAX_CHARS = 1500` (≈ 375 tokens on English prose at the ~4-chars-per-token rule of thumb; safely under all v1 embedding-model input caps — OpenAI text-embedding-3-small is 8191 tokens, Ollama nomic-embed-text is 2048+). The 1500-char target is a soft hint for the structure-aware strategies (chunks under it are kept whole; chunks over it split at paragraph / sentence boundaries before re-checking). Plaintext: hard 1500-char windows with 200-char overlap.
+
+If real-world embedding calls hit input-cap rejections (rare at 1500 chars; would mean ≥4 chars per token on dense input the rule-of-thumb undershoots), promoting to a `tiktoken` dependency is the m7-followup escalation — the chunker swaps the char-cap for a token-cap with the same shape. Not preempted in v1.
 
 ### D4 — Retrieval shape: **top-K chunks injected into the system prompt at chat-turn time** (v1); LLM-callable `retrieveDocs` tool deferred to m7-followups
 
@@ -145,6 +165,15 @@ The promt21 mentioned: OpenAI `gpt-4o` / `gpt-4o-mini` / `o1`; Ollama `llama3.3`
 **Provider catalog**: a `KNOWN_MODELS` table in `packages/llm-provider/src/models.ts` mapping `{ provider, modelId } → { displayName, contextWindow, inputPrice, outputPrice, supportsTools, supportsVision }`. The renderer's model-picker UI reads this; the pricing layer for the UsageBadge reads this. Adding a new model = one row.
 
 **v1 ships**: Anthropic (claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5 — already in M6) + OpenAI (gpt-4o, gpt-4o-mini) + Ollama (llama3.3, qwen2.5). Adding more models is m7-followup table-edit work; doesn't need new adapter code.
+
+**D5 nuance (promt22) — Ollama runtime-detect installed models via `GET /api/tags`.** Hardcoding `llama3.3` / `qwen2.5` as the Ollama list freezes the picker; operators pull whatever models suit their workflow + the v1 picker should reflect what's actually installed. The shape:
+
+- The Ollama picker (in workspace settings + the profile editor's LLM override) populates from `GET <baseUrl>/api/tags` on mount + on a "Refresh" button click. The endpoint returns `{models: [{name: 'llama3.3:latest', size, modified_at, ...}, ...]}` — the model list the operator has locally pulled.
+- `KNOWN_MODELS` for Ollama is now **the recommended list, not the exhaustive list**. The picker shows: a "Recommended (installed)" section (the intersection of `KNOWN_MODELS` Ollama entries and `api/tags`), an "Installed" section (everything else from `api/tags`), and a "Recommended (not installed)" section (the rest of `KNOWN_MODELS` for Ollama — grey-italic with a hint "Run `ollama pull <model>` to install").
+- **Fallback when Ollama unreachable** (`api/tags` errors out — Ollama not running / wrong baseUrl / network):
+  - Picker shows only the recommended list (greyed, with an icon hint "Ollama not reachable — check baseUrl + that Ollama is running"). Operator can still pick a model + save the setting (validates at first chat send instead).
+  - A "Retry" button on the picker re-fires `api/tags`. Same button label / placement on the Refresh action when reachable.
+- **Pricing rows for unknown models**: the `KNOWN_MODELS` catalog continues to drive UsageBadge cost estimation. Operator-installed-but-not-recommended models land with cost = $0 (Ollama is always free) but a "Model not in the local catalog — token counts shown, cost shown as $0" note in the usage tooltip (the M5 unknownModel locale string already covers this shape).
 
 ### D6 — Provider selection UI: **per-profile override stored in `workspace.json`** + workspace-default fallback
 
@@ -199,6 +228,13 @@ Three credible scopes:
 - A "Scope" picker on the upload dialog: "This connection only" (default) / "All connections" (workspace-wide) / "Selected connections" (multi-select).
 - The document library view shows the scope per doc + lets the operator change it post-upload.
 
+**D7 nuance (promt22) — bulk retagging UI.** Operators discover post-upload that a manual applies to more profiles than the one active at upload time ("turns out the same Carrier RTU manual covers customers A + B + C"). Retroactive single-doc correction is tedious without bulk action:
+
+- The library view's list rows gain checkboxes; a "Select all" / "Clear" affordance lives in the header.
+- When ≥1 document is selected, a "Bulk actions" bar appears: **"Apply scope to N selected"** (the primary), **"Delete N selected"** (destructive-styled, confirm), **"Re-index N selected"** (for the dimension-mismatch case from D2's nuance).
+- Bulk scope apply opens the same scope picker as upload + applies to the N selected on confirm. Existing scope tags on the targets are *replaced* (not merged) — the picker shows "Replacing scope on N documents" so the operator knows.
+- The IPC: `rag:documents:bulk-update-scope({ documentIds, scope })` — one round-trip, server-side batched update inside a sqlite transaction.
+
 **Storage**: a single `documents` table in the sqlite DB (per D1) carries `scope_workspace BOOLEAN` + `scope_profile_ids_json TEXT`; one Workspace = one library + per-document scope decisions.
 
 ### D8 — RAG knowledge tier interaction with M6 tier 1: **both layered into the system prompt, separately marked**
@@ -215,7 +251,9 @@ Why this order: the operator's structured knowledge (Niagara's queryable invento
 
 **No tier-1-vs-tier-2 conflict**: tier 1 is one-shot per conversation (cached via M6 C85b's cache layer); tier 2 is per-turn (re-runs every chat message). They share the same system-prompt assembly path; the retrieval pass appends to the cached output of the plugin assembly.
 
-**Cap accounting** — the assembled system prompt has a soft cap (already enforced by the M6 cache: each plugin section caps at ~1k tokens of injected context). M7 adds a separate cap on the retrieved-chunks block: 2000 tokens (the K=4 × 500-token chunks). Total system prompt overhead: ~3–4 k tokens, well below all v1 provider context windows (Anthropic 200k, OpenAI 128k, Ollama 8–32k).
+**Cap accounting (v1)** — the assembled system prompt has a soft cap (already enforced by the M6 cache: each plugin section caps at ~1k tokens of injected context). M7 adds a separate cap on the retrieved-chunks block: K=4 chunks × `MAX_CHARS` (1500 chars ≈ 375 tokens) ≈ ~1500 tokens total at the retrieval stage. Combined system-prompt overhead: ~3–4 k tokens, well below all v1 provider context windows (Anthropic 200k, OpenAI 128k, Ollama 8–32k).
+
+**D8 nuance (promt22) — explicit token-budget management deferred to m7-followups.** Per the M6 D5 / promt19 cost-transparency line: the M6 summariser already keeps long conversations from blowing the context window. The v1 retrieval cap (~1500 tokens) is small enough that even a near-50k-token conversation plus tier 1 + tier 2 stays well inside the 128k OpenAI window. Active token-budget management (recompute per-provider available room before each turn + dynamically scale K / chunk size based on `conversation.usage`) is **deferred** — surfaces as m7-followup work only if real-world operators hit the upper bound on Ollama's smaller windows (8 k / 32 k variants) or on a long M6-summarised conversation. The hook: `MAX_RETRIEVED_TOKENS` is a constant in `packages/rag/src/retrieval.ts`; promoting it to a per-turn-dynamic-budget reading is a single function-extraction follow-up.
 
 ### D9 — Citation tracking: **chunk markers in the injected prompt + chat-renderer chips that open the source**
 
@@ -227,6 +265,14 @@ Citations land in two places:
 **Click action**:
 - **v1**: `useHostBus.publishDocOpen({ docId, page? })` + an AppShell consumer that opens the file via `shell.openPath(absolutePath)` (Electron's documented file-opener). For PDFs this opens the system PDF viewer at the right page (depends on platform PDF reader; not all jump to page).
 - **v2 / m7-followup**: an in-app document viewer side panel with PDF.js for PDFs + markdown rendering for `.md`. Side panel implementation is the m7-followup add-on.
+
+**D9 nuance (promt22) — citation chip hover preview.** Clicking to verify a citation is friction; many citations the operator wants to confirm at a glance ("does that page really say what the LLM claims?"). The hover preview:
+
+- Each rendered chip carries a tooltip (the existing M5 `<ord>` chip pattern uses radix `Tooltip` from `@mcp-studio/ui` — same primitive lifts here).
+- Tooltip contents: **doc title · page (or section) · the first ~100 chars of the cited chunk's text**, ellipsised. Format: `Carrier Manual.pdf · p.23 · '…recommended setpoint range is 21–23 °C…'`.
+- The chip itself stays compact (just the doc title + page). Operator hovers → tooltip surfaces; clicks → file opens via `shell.openPath`.
+- Chip-data shape: when the retrieval pass injects chunks into the prompt, it also stashes the chunk previews in a renderer-side cache (keyed by chunk id; lives for the conversation). The MarkdownRenderer's chip handler reads from this cache on hover; cache miss → no tooltip body (silent — production behaviour after a renderer reload mid-conversation; the chip still works, just no preview).
+- The cache lives in `useDocCitationCache` (new Zustand store), populated by the chat-runner's pre-streamResponse retrieval step.
 
 **No citation in retrieved-but-unused scenario**: if the LLM doesn't cite a chunk in its response, the chunk's relevance was implicit. We don't post-process to extract retrieved-chunk-IDs and surface them as "we considered these" — that's noise. The operator sees only what the LLM actively cited.
 
@@ -316,8 +362,11 @@ M7 is **packages/rag local vector store + chunking + embedding pipeline + docume
   - `packages/rag/src/document-repository.ts` — list / save / delete documents + chunks, joined to embeddings via chunk_id.
   - `apps/desktop/package.json` deps: `better-sqlite3`, `sqlite-vec`, `@electron/rebuild` (devDep).
   - `apps/desktop/build/rebuild-native.cjs` — postinstall script that calls `@electron/rebuild` against the bundled Electron version. CI step in `package.yml` reused.
-  - + ~20 unit tests (mock the sqlite-vec extension load; test against an in-memory `:memory:` DB; round-trip a known embedding + assert ANN returns the same row). **AC**: `pnpm install` runs `electron-rebuild`; `rag.db` opens on first app launch on Windows + macOS; the unit tests pass against the headless sqlite without the extension (extension-loading is gated behind a `loadExtension` flag the tests skip).
-- **C92 — `feat(desktop): migrate workspace storage from JsonStore to better-sqlite3 (closes M1-followup) + workspace.json.legacy back-compat`**. Two-stage commit:
+  - + ~20 unit tests (mock the sqlite-vec extension load; test against an in-memory `:memory:` DB; round-trip a known embedding + assert ANN returns the same row).
+  - **Platform smoke (promt22 D1 nuance hard gate)**: `packages/rag/smoke/platform-smoke.mjs` — standalone script that opens an in-memory `better-sqlite3` DB, calls `db.loadExtension(VEC_PATH)`, creates a `vec0` virtual table, inserts 100 random 1536-dim vectors, queries `vec_distance_cosine` for the top-1 neighbour of one of them + asserts identity match. Exits 0 on success, non-zero with diagnostic on failure. **C91 commit message must carry the local-platform smoke result; cross-platform CI runs on the C91 PR before C92 lands.**
+  - **AC**: `pnpm install` runs `electron-rebuild`; `rag.db` opens on first app launch on the C91 author's platform; the unit tests pass against the headless sqlite without the extension (extension-loading is gated behind a `loadExtension` flag the tests skip); the platform-smoke passes locally + the CI matrix run (Windows + macOS + Linux) passes before C92 begins.
+  - **Smoke-fail contingency** (decided at smoke-fail time, documented in the "Adjustments during the M7 build" section): either (a) switch v1 vector store to LanceDB + defer the workspace-store migration to a later milestone (separate the two payloads — Phase A re-scopes), OR (b) ship sqlite-vec for the rag.db only + defer the workspace-store migration to a later milestone (keep `workspace.json`).
+- **C92 — `feat(desktop): migrate workspace storage from JsonStore to better-sqlite3 (closes M1-followup) + workspace.json.legacy back-compat`** — **only commits if C91 platform-smoke passed on all three CI platforms**. Two-stage commit:
   - `apps/desktop/src/main/store/sqlite-workspace-store.ts` — a new store with the same `JsonStore<WorkspaceData>` surface (`data`, `save`, `migrate` callback). Persists to `<userDataDir>/workspace.db` via `better-sqlite3` — same `_meta` schema-version row pattern as `rag.db`.
   - On first launch: detects `workspace.json` (the legacy M1–M6 JSON file), reads it, imports into sqlite, renames the file to `workspace.json.legacy`. M8 deletes the legacy file after one milestone of soak.
   - `apps/desktop/src/main/index.ts` switches `createWorkspaceStore(userDataDir)` → `createSqliteWorkspaceStore(userDataDir)` (one-line wiring change; same interface).
@@ -377,7 +426,7 @@ M7 is **packages/rag local vector store + chunking + embedding pipeline + docume
   - `tests/e2e/multi-provider-switch.spec.ts` — extend the existing mock LLM provider with an `openai-mock` program OR add a renderer-side provider-mode override that lets the e2e pick "fake-openai" / "fake-ollama" providers. Switch the active connection's profile to use the fake OpenAI; send a message; assert the FakeOpenAiProvider's program ran. Same for Ollama.
   - **AC**: e2e green ×13 (11 carry-over from M6 + 2 new M7 specs).
 - **C99 — `chore: M7 docs + close the milestone + tag v0.7.0-m7`**. Final docs:
-  - `docs/m7-followups.md` — the M7-deferred items (m7-followups: `o1` / reasoning model OpenAI support; per-conversation provider; in-app PDF/MD viewer; LLM-callable `retrieveDocs` tool with new PlanStep kind; plugin-contributed chunking / retrieval-scope overrides; .docx / .html / images-with-OCR document types; auto-re-index file watcher; multi-modal embeddings; embedding-model switch one-click "re-index all" UX).
+  - `docs/m7-followups.md` — the M7-deferred items (m7-followups: `o1` / reasoning model OpenAI support; per-conversation provider; in-app PDF/MD viewer; LLM-callable `retrieveDocs` tool with new PlanStep kind; plugin-contributed chunking / retrieval-scope overrides; .docx / .html / images-with-OCR document types; auto-re-index file watcher; multi-modal embeddings; embedding-model switch one-click "re-index all" UX; **promt22 deferrals**: dynamic per-turn token-budget management for retrieval cap; `tiktoken` dependency upgrade if char-cap real-world tests trigger embedding-input-cap rejections; in-app PDF viewer side panel).
   - `docs/master-spec.md` — an "M7 — RAG tier 2 + multi-provider (2026-…, `v0.7.0-m7`)" section.
   - `docs/m1-followups.md` — mark "better-sqlite3 store" item resolved (M7 C92 closes it). The niagaramcp-side `knowledgeHash` coordination item stays open.
   - `docs/m6-followups.md` — mark "knowledgeHash coordination" item still open (M7 doesn't change it).
@@ -387,6 +436,8 @@ M7 is **packages/rag local vector store + chunking + embedding pipeline + docume
   - **AC**: docs reflect the shipped state; tag annotated; release notes for v0.7.0-m7.
 
 - → **Big check-in after Phase D:** `git log --oneline` C90–C99 + new screenshots (`m7-knowledge-view`, `m7-chat-with-citation`, `m7-provider-picker-settings`, `m7-profile-llm-override`); coverage report; e2e green ×13; the tag `v0.7.0-m7`. Then M8 — visual flow builder per the roadmap (`packages/flow-builder` + canvas editor + the trigger/condition/tool-call/llm-step/aggregator/output node palette editing the M6 `DiagnosticFlow.plan` shape).
+
+**Checkpoint cadence (promt22 confirmed)**: Phase A → checkpoint after C92; Phase B → checkpoint after C95; Phase C → checkpoint after C97 (the M7 deliverable); Phase D → big checkpoint after C99 + tag. C91's platform-smoke gate is enforced within Phase A (C91 commits + smoke runs; C92 only commits if smoke passed).
 
 ---
 
