@@ -164,6 +164,35 @@ export const SUMMARY_TRIGGER_THRESHOLD = 180;
 export const HEAD_SLICE_COUNT = 100;
 
 /**
+ * **E2E test hook (C88).** The chat-summary e2e drives the head-trim path
+ * end-to-end; bloating a real conversation to 180 messages via UI clicks is
+ * impractical, so the e2e sets `window.__MCPSTUDIO_E2E_SUMMARY_TUNING`
+ * before the assistant tab mounts to override the threshold + slice-size
+ * constants. Production never sets this object — the getters short-circuit
+ * back to the module defaults.
+ */
+interface SummaryTuningOverride {
+  triggerThreshold?: number;
+  headSliceCount?: number;
+}
+function readTuningOverride(): SummaryTuningOverride | undefined {
+  const g = globalThis as { __MCPSTUDIO_E2E_SUMMARY_TUNING?: SummaryTuningOverride };
+  return g.__MCPSTUDIO_E2E_SUMMARY_TUNING;
+}
+/** Runtime-resolved trigger threshold — defaults to {@link SUMMARY_TRIGGER_THRESHOLD},
+ *  overridable by the e2e tuning hook. */
+export function getTriggerThreshold(): number {
+  const t = readTuningOverride()?.triggerThreshold;
+  return typeof t === 'number' && t > 0 ? t : SUMMARY_TRIGGER_THRESHOLD;
+}
+/** Runtime-resolved head-slice count — defaults to {@link HEAD_SLICE_COUNT},
+ *  overridable by the e2e tuning hook. */
+export function getHeadSliceCount(): number {
+  const c = readTuningOverride()?.headSliceCount;
+  return typeof c === 'number' && c > 0 ? c : HEAD_SLICE_COUNT;
+}
+
+/**
  * Slice `messages` into the head (to be summarised) + tail (to keep).
  *
  * **Re-summarisation continuity** (promt19 edge case #4): if the conversation

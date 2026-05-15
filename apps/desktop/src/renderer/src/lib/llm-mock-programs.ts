@@ -1,4 +1,4 @@
-import type { MockProgram } from '@mcp-studio/llm-provider';
+import type { LlmStreamRequest, MockProgram } from '@mcp-studio/llm-provider';
 import { matchUserText } from '@mcp-studio/llm-provider';
 
 /**
@@ -189,6 +189,73 @@ export const MOCK_PROGRAMS: MockProgram[] = [
     ],
   },
 
+  // **M6 C88** — summariser-call mock programs. The C86 summariser invokes
+  // `provider.streamResponse` with `system: SUMMARISER_SYSTEM_PROMPT` (the
+  // "preserve key facts / tool results / conclusions / pending questions"
+  // prompt) and the head slice + a trailer user message asking for the
+  // summary. Match on the trailer to route summariser calls to these
+  // programs vs the main chat programs above. Two variants:
+  //
+  //   `summary-failure` — first because the matcher fires before
+  //     `summary-success`; routes calls whose head slice carries the
+  //     `SUMMARY_FAILURE_SENTINEL` user message to a single error event
+  //     (drives the chat-summary e2e's failure-path assertions: the
+  //     fallback chip + the silent-drop outcome).
+  //   `summary-success` — clean ≤200-token summary; the chat-summary e2e
+  //     observes the collapsible summary marker in the conversation log.
+  {
+    id: 'summary-failure',
+    match: (req) => isSummariserRequest(req) && summariserHeadCarriesSentinel(req),
+    turns: [
+      {
+        events: [
+          {
+            type: 'message-start',
+            messageId: 'mock_summary_fail',
+            model: 'mock',
+            usage: { inputTokens: 100, outputTokens: 0 },
+          },
+          {
+            type: 'error',
+            error: { type: 'mock_summariser_fault', message: 'simulated summariser provider error' },
+          },
+          {
+            type: 'message-stop',
+            stopReason: null,
+            usage: { inputTokens: 100, outputTokens: 0 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'summary-success',
+    match: (req) => isSummariserRequest(req),
+    turns: [
+      {
+        events: [
+          {
+            type: 'message-start',
+            messageId: 'mock_summary_ok',
+            model: 'mock',
+            usage: { inputTokens: 120, outputTokens: 0 },
+          },
+          {
+            type: 'text-stop',
+            index: 0,
+            text:
+              'Earlier in this conversation, I helped the operator walk through several rooftop diagnostic steps for AHU-1. We confirmed the equipment was operating within normal range and that no active alarms were present at the time of the checks.',
+          },
+          {
+            type: 'message-stop',
+            stopReason: 'end_turn',
+            usage: { inputTokens: 120, outputTokens: 45 },
+          },
+        ],
+      },
+    ],
+  },
+
   {
     id: 'cancel',
     match: matchUserText('story'),
@@ -229,3 +296,42 @@ export const MOCK_PROGRAMS: MockProgram[] = [
     ],
   },
 ];
+
+/**
+ * Sentinel user-message text the chat-summary e2e seeds into the head slice
+ * to force the summariser-failure path (vs the default success path).
+ * Lives as an exported constant so the spec + the matcher share the same
+ * string.
+ */
+export const SUMMARY_FAILURE_SENTINEL = '__MCPSTUDIO_E2E_FORCE_SUMMARY_FAILURE__';
+
+/** True if `req` looks like a summariser invocation (the C86 head-trim
+ *  path). Two signals: the system prompt is the SUMMARISER_SYSTEM_PROMPT
+ *  (we sniff a stable phrase) and the trailer user message carries the
+ *  "Summarise the conversation above" string. Either signal alone is
+ *  enough; both together are conclusive. */
+function isSummariserRequest(req: LlmStreamRequest): boolean {
+  const system = typeof req.system === 'string' ? req.system : '';
+  if (system.includes('compress an earlier slice of a chat conversation')) return true;
+  // Fallback: inspect the last user message for the summariser trailer.
+  const last = req.messages.at(-1);
+  if (!last || last.role !== 'user') return false;
+  for (const block of last.content) {
+    if (block.type === 'text' && block.text.includes('Summarise the conversation above')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** True if any message in the summariser's head slice carries the
+ *  failure-sentinel text. The chat-summary e2e seeds this sentinel into
+ *  a user message before triggering the trim. */
+function summariserHeadCarriesSentinel(req: LlmStreamRequest): boolean {
+  for (const m of req.messages) {
+    for (const block of m.content) {
+      if (block.type === 'text' && block.text.includes(SUMMARY_FAILURE_SENTINEL)) return true;
+    }
+  }
+  return false;
+}

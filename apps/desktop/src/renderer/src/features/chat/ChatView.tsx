@@ -38,9 +38,9 @@ import {
 } from '@renderer/lib/plugin-prompts';
 import { preselectionForLaunch, selectionLabel } from '@renderer/lib/host-selection';
 import {
+  getTriggerThreshold,
   resolveSummariserModel,
   runSummariser,
-  SUMMARY_TRIGGER_THRESHOLD,
   type SummariserModelPreference,
 } from '@renderer/lib/summariser';
 import { cn } from '@renderer/lib/utils';
@@ -300,7 +300,7 @@ export function ChatView() {
   useEffect(() => {
     if (!activeConversation || !profileId) return;
     if (summarisingRef.current) return;
-    if (activeConversation.messages.length < SUMMARY_TRIGGER_THRESHOLD) return;
+    if (activeConversation.messages.length < getTriggerThreshold()) return;
     if (providerMode === null) return;
     if (providerMode === 'anthropic' && hasKey !== true) return;
     summarisingRef.current = true;
@@ -811,10 +811,19 @@ export function ChatView() {
           );
         } else if (ev.type === 'plan-step-complete') {
           if (currentStepId) {
-            await persistStepMessages(currentStepId, ev.kind, ev.result);
+            // Snapshot the id BEFORE we clear `currentStepId` below — the
+            // setPendingPlan updater fires later (React batches state
+            // updates), and reading the captured-by-reference `let`
+            // through the closure would observe the nulled value
+            // (silently produces `[null]: {status:'done'}` and the real
+            // step never transitions out of 'running'). Caught by the
+            // M6 C88 e2e: pre-fix the summary showed "0/5 done · 1
+            // skipped" instead of "4/5 done · 1 skipped".
+            const stepId = currentStepId;
+            await persistStepMessages(stepId, ev.kind, ev.result);
             setPendingPlan((p) =>
               p && p.executionState
-                ? { ...p, executionState: { ...p.executionState, [currentStepId!]: { status: 'done' } } }
+                ? { ...p, executionState: { ...p.executionState, [stepId]: { status: 'done' } } }
                 : p,
             );
           }

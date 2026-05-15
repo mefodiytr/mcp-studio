@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import type { Conversation, Message } from '../../../shared/domain/conversations';
 import type { LlmUsage } from '@mcp-studio/llm-provider';
 
-import { computeHeadSlice, type SummariserResult } from '../lib/summariser';
+import { computeHeadSlice, getHeadSliceCount, type SummariserResult } from '../lib/summariser';
 
 function bridge(): NonNullable<typeof window.studio> {
   if (!window.studio) throw new Error('IPC bridge unavailable');
@@ -154,7 +154,7 @@ export const useConversationsStore = create<ConversationsState>((set, get) => ({
     if (!current) {
       return { outcome: 'noop', reason: 'missing-conversation', conversation: null };
     }
-    const { headSlice, tail } = computeHeadSlice(current.messages);
+    const { headSlice, tail } = computeHeadSlice(current.messages, getHeadSliceCount());
     if (headSlice.length === 0) {
       return { outcome: 'noop', reason: 'no-head-to-trim', conversation: null };
     }
