@@ -20,18 +20,18 @@ applies; M4 introduced no new server-side asks).
 
 ## Plugin-api seams (emerging contracts)
 
-- **`useExplorerStore.known` as a session-scoped shared cache.** Three
-  consumers as of M4 (M2 QuickNav fuzzy picker, M4 HistoryView's overlay
-  picker, M4 MonitorView's drop-target displayName lookup); the M5 AI
-  co-pilot's ord autocomplete will be the fourth. The store is currently
-  internal to the Niagara plugin (`plugins/niagara/src/state/explorer-store.ts`)
-  and unbounded — every node seen during a session accumulates without an
-  eviction policy. Document its semantics (session-scoped, unbounded,
-  populated by `listChildren` per-node), an LRU/age-out eviction policy
-  (cap at ~10k entries?), and a "register a newly-encountered ord"
-  contract so future views can contribute (e.g. the BQL playground could
-  register the ords its result set surfaced). Surface in `CONTRIBUTING.md`
-  alongside the M3 Zustand-singleton lesson.
+- ~~**`useExplorerStore.known` as a session-scoped shared cache.**~~
+  **Closed by M6 C87** — the 5th consumer (selection-aware diagnostic
+  flows via `useHostBus.selectedOrd`) tripped the formalisation
+  threshold. Contract now lives in `CONTRIBUTING.md` "Cross-view explorer
+  state": semantics (session-scoped, never-evicted Map), registration
+  pattern (`remember(nodes)` walks `children?` recursively, called by
+  any view that receives fresh nodes outside the tree-load path), full
+  consumer roster (QuickNav M2 + HistoryView M4 + MonitorView M4 + M6
+  selection-aware flows + future M7 RAG-on-selection / M8 visual flow
+  builder ord-picker), cross-plugin reach via `useHostBus`. LRU/age-out
+  eviction explicitly noted as future work in `m6-followups.md` —
+  not blocking until a 50k-component station shows up.
 - **`ctx.workspace.watches` (or similar persistence seam) on PluginContext.**
   The M4 watch store is the second `window.studio.invoke` consumer inside
   the plugin (after the M3 Bearer bootstrap's `credentials:set` +

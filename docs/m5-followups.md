@@ -103,12 +103,18 @@ against the M4-era niagaramcp tool surface).
 
 ## UX polish
 
-- **Conversation summary at head-trim.** M5 D3 sets a 200-message cap +
-  head-trims with a `<system message: earlier messages trimmed>`
-  placeholder — context loss after the trim. M6 polish lifts this to
-  "LLM summarises the trimmed prefix into a single replacement system
-  message", preserving the gist across long sessions. Uses the same
-  LlmProvider — no new dep.
+- ~~**Conversation summary at head-trim.**~~ **Closed by M6 C86**
+  (`docs/milestone-6.md` D5; commit `feat(desktop): summarise-then-drop
+  on conversation head-trim`). Trigger moved from the hard-cap silent-
+  drop to a renderer-side useEffect at `SUMMARY_TRIGGER_THRESHOLD = 180`
+  (the **race-against-a-hard-cap** pattern documented in CONTRIBUTING.md
+  — start work N samples before the limit to absorb async-call latency).
+  Summary replaces the head as a single synthetic `marker: 'summary'`
+  assistant message rendered as a collapsible card. Summariser model
+  configurable via `WorkspaceLlmSettings.summariserModel` (default
+  `'haiku'`). Failure path falls back to the M5 silent-drop + surfaces a
+  warning chip — the **graceful-degradation-on-background-LLM-call-failure**
+  pattern, also paternised in CONTRIBUTING.md.
 
 - **Richer starter chips with ord autocomplete.** M5 ships static-string
   chips ("Pick the rooftop unit (or any AHU) you find …"). M6+ could
@@ -116,7 +122,10 @@ against the M4-era niagaramcp tool surface).
   cache) so the chip morphs into "What's the current status of <ord
   picker>?" with a live dropdown. Surfaced from the existing
   `Plugin.starterQuestions` contract — the plugin returns templates with
-  named slots, the host renders the picker UI per slot.
+  named slots, the host renders the picker UI per slot. **M6 C87** added
+  the selection-aware substrate (`useHostBus.selectedOrd` derived from
+  `useExplorerStore.known`) for the diagnostic-flow buttons; extending
+  the same substrate to starter chips is a small remaining polish item.
 
 - **Per-watch threshold notifications** — M4 followup, carries forward.
   M5 didn't add it; the chat could surface "your AHU-2 SAT crossed the
