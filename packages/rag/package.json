@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-studio/rag",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "RAG tier 2 substrate — local vector store via sqlite-vec, document repository, chunking, embedding-provider interface. Main-process consumption (the embedding + indexing pipeline + the chat-turn retrieval pass live in main; the renderer talks to it via the rag:* IPC channels).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "smoke": "node smoke/platform-smoke.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "sqlite-vec": "^0.1.6",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "vitest": "^2.1.9"
+  }
+}

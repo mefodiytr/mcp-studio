@@ -472,6 +472,14 @@ M7 is **packages/rag local vector store + chunking + embedding pipeline + docume
 
 *(Filled in as commits land, per the M1–M6 pattern. The shipped state lives here; commit messages flag deviations; `m7-followups.md` carries the deferred list.)*
 
+**C91 — platform smoke result.** Local platform: **win32 x64, Node v22.21.0 — PASS.** sqlite-vec v0.1.9 loads; `vec0` virtual table creates; insert + cosine search return the expected nearest neighbour with distance ~0. Cross-platform CI matrix run on the C91 PR is pending; C92 (workspace-store migration) blocked until macOS + Linux pass.
+
+**C91 — pnpm build-approval addition.** `pnpm-workspace.yaml`'s `onlyBuiltDependencies` + `allowBuilds` gained an entry for `better-sqlite3` — pnpm 11 blocks all postinstall build scripts by default + needed approval to run `prebuild-install` for the native binary. Same shape as the existing electron + esbuild entries. No CI workflow change needed; pnpm reads the workspace file.
+
+**C91 — `INSERT OR REPLACE` cascade bug caught by unit test.** First implementation of `DocumentRepository.save` ran `INSERT OR REPLACE INTO documents(...)` BEFORE reading prior chunks via `SELECT * FROM chunks WHERE document_id = ?`. With `foreign_keys = ON`, the REPLACE deletes the old document row → ON DELETE CASCADE removes all its chunks → the subsequent SELECT returns zero rows → the vector-store side keeps stale embeddings → re-index leaves orphan embeddings. Fix: read prior chunks first; THEN do the document INSERT OR REPLACE. The "save replaces prior chunks on re-index (cascades through vector store)" test pins the invariant.
+
+**C91 — markdown chunker test made section content longer.** Tiny markdown sections (under 600 chars) merge into one chunk by design; the test originally asserted section metadata on the merged chunk but the merger keeps only the first section's path. Test content updated to ≥ MIN_MERGE_CHARS per section so each chunk gets its own heading path.
+
 ## Ad-hoc check-in triggers (otherwise: note-and-continue)
 
 The same five-trigger discipline from M6:

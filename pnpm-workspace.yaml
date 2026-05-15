@@ -11,10 +11,14 @@ packages:
 nodeLinker: hoisted
 
 # Postinstall/build scripts allowed to run (pnpm blocks all by default).
-# electron — extracts the prebuilt Electron binary; esbuild — installs its native binary.
+# electron — extracts the prebuilt Electron binary; esbuild — installs its native binary;
+# better-sqlite3 — node-gyp-build resolves the prebuilt native binary for the current
+# platform (the M7 RAG package's sqlite-vec extension is loaded via this binary).
 onlyBuiltDependencies:
   - electron
   - esbuild
+  - better-sqlite3
 allowBuilds:
   electron: true
   esbuild: true
+  better-sqlite3: true
