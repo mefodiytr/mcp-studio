@@ -29,3 +29,31 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # **M7 C91 — sqlite-vec platform smoke (promt22 D1 hard gate).** Verifies
+  # that `better-sqlite3` builds + `sqlite-vec` loads + the `vec0` virtual
+  # table executes basic ops on all three target platforms before C92
+  # (workspace-store migration to sqlite) is allowed to land. Promt22
+  # explicitly: "If smoke fails on any platform, fall back to LanceDB OR
+  # defer workspace migration to separate later milestone. Don't proceed
+  # with double-or-nothing without verification."
+  #
+  # All three jobs must be green to clear the gate. Failure on any
+  # platform surfaces the smoke script's diagnostic + blocks C92 until
+  # the contingency is picked.
+  rag-platform-smoke:
+    name: rag-platform-smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mcp-studio/rag smoke

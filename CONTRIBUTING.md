@@ -136,6 +136,30 @@ See `docs/milestone-1.md` / `milestone-2.md` for worked examples (plan + the "Ad
   manual launch + surface a chip. Pattern stays consistent:
   `runX → Promise<XResult | null>` (never throws); caller branches
   on null → silent baseline + chip; success → chip cleared.
+- **SQLite `INSERT OR REPLACE` + `foreign_keys = ON` requires
+  read-before-upsert when prior child data is needed** (M7 C91 —
+  the DocumentRepository.save bug). `INSERT OR REPLACE INTO parent`
+  doesn't just update; it deletes the conflicting row + re-inserts.
+  When the parent has FK children with `ON DELETE CASCADE`, those
+  children vanish too. Any code path that wants to inspect, copy,
+  or transactionally hand-off children before the parent is
+  re-inserted **must read them BEFORE the REPLACE**, not after.
+  The C91 instance: `DocumentRepository.save` had to clean up
+  per-chunk embeddings from the vector store (a sibling table not
+  under FK cascade), so it iterated prior chunks + called
+  `vectorStore.delete(chunk.id)` on each. First impl ran the
+  document REPLACE first → FK cascade silently deleted the chunks
+  rows → the subsequent SELECT returned zero → the vector-store
+  side kept stale embeddings forever (re-index left orphans). Fix:
+  SELECT chunks first; THEN REPLACE the document. The
+  "save replaces prior chunks on re-index (cascades through vector
+  store)" unit test pins the invariant; the M7 C92 workspace-store
+  migration + every future sqlite-backed repo with this shape
+  applies the same ordering. Alternative when read-before isn't
+  practical: use SQL UPSERT (`INSERT … ON CONFLICT(id) DO UPDATE
+  SET …`) which doesn't cascade because the row isn't deleted —
+  but that constrains the update to columns you can express, so
+  the read-before-REPLACE shape stays the canonical choice.
 
 ## Cross-view explorer state (`useExplorerStore.known` contract)
 
